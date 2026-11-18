@@ -1,0 +1,221 @@
+{
+  "schema": 1,
+  "id": "euclidean_arp",
+  "name": "Euclidean Arp",
+  "press": "page",
+  "resources": {},
+  "presets": {},
+  "parameters": [
+    {
+      "id": "rate",
+      "label": "RATE",
+      "default": 0.625,
+      "mapping": {
+        "kind": "enum",
+        "labels": [
+          "1-4",
+          "1-8",
+          "1-16",
+          "1-32"
+        ]
+      },
+      "display": "enum"
+    },
+    {
+      "id": "style",
+      "label": "STYLE",
+      "default": 0.083333,
+      "mapping": {
+        "kind": "enum",
+        "labels": [
+          "UP",
+          "DOWN",
+          "UP-DN",
+          "ORDER",
+          "RAND",
+          "CHORD"
+        ]
+      },
+      "display": "enum"
+    },
+    {
+      "id": "octave",
+      "label": "OCTAVE",
+      "default": 0.125,
+      "mapping": {
+        "kind": "enum",
+        "labels": [
+          "1",
+          "2",
+          "3",
+          "4"
+        ]
+      },
+      "display": "enum"
+    },
+    {
+      "id": "gate",
+      "label": "GATE",
+      "default": 0.447368,
+      "mapping": {
+        "kind": "enum",
+        "labels": [
+          "10",
+          "15",
+          "20",
+          "25",
+          "30",
+          "35",
+          "40",
+          "45",
+          "50",
+          "55",
+          "60",
+          "65",
+          "70",
+          "75",
+          "80",
+          "85",
+          "90",
+          "95",
+          "100"
+        ]
+      },
+      "display": "enum"
+    },
+    {
+      "id": "steps",
+      "label": "STEPS",
+      "default": 0.46875,
+      "mapping": {
+        "kind": "enum",
+        "labels": [
+          "1",
+          "2",
+          "3",
+          "4",
+          "5",
+          "6",
+          "7",
+          "8",
+          "9",
+          "10",
+          "11",
+          "12",
+          "13",
+          "14",
+          "15",
+          "16"
+        ]
+      },
+      "display": "enum"
+    },
+    {
+      "id": "hits",
+      "label": "HITS",
+      "default": 0.323529,
+      "mapping": {
+        "kind": "enum",
+        "labels": [
+          "0",
+          "1",
+          "2",
+          "3",
+          "4",
+          "5",
+          "6",
+          "7",
+          "8",
+          "9",
+          "10",
+          "11",
+          "12",
+          "13",
+          "14",
+          "15",
+          "16"
+        ]
+      },
+      "display": "enum"
+    },
+    {
+      "id": "rotate",
+      "label": "ROTATE",
+      "default": 0.03125,
+      "mapping": {
+        "kind": "enum",
+        "labels": [
+          "0",
+          "1",
+          "2",
+          "3",
+          "4",
+          "5",
+          "6",
+          "7",
+          "8",
+          "9",
+          "10",
+          "11",
+          "12",
+          "13",
+          "14",
+          "15"
+        ]
+      },
+      "display": "enum"
+    },
+    {
+      "id": "accent",
+      "label": "ACCENT",
+      "default": 0.5,
+      "mapping": {
+        "kind": "enum",
+        "labels": [
+          "-100",
+          "-95",
+          "-90",
+          "-85",
+          "-80",
+          "-75",
+          "-70",
+          "-65",
+          "-60",
+          "-55",
+          "-50",
+          "-45",
+          "-40",
+          "-35",
+          "-30",
+          "-25",
+          "-20",
+          "-15",
+          "-10",
+          "-5",
+          "0",
+          "+5",
+          "+10",
+          "+15",
+          "+20",
+          "+25",
+          "+30",
+          "+35",
+          "+40",
+          "+45",
+          "+50",
+          "+55",
+          "+60",
+          "+65",
+          "+70",
+          "+75",
+          "+80",
+          "+85",
+          "+90",
+          "+95",
+          "+100"
+        ]
+      },
+      "display": "enum"
+    }
+  ]
+}

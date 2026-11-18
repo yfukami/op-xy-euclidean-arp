@@ -1,0 +1,366 @@
+#include <cstring>
+#include "harness.hpp"
+
+enum { R4, R8, R16, R32 };
+static const u32 kRateSteps[4] = {240, 120, 60, 30};
+typedef std::vector<u32> Notes;
+
+static std::vector<int> bjorklund(u32 hits, u32 steps) {
+    typedef std::vector<int> Group;
+    std::vector<Group> a(hits, Group(1, 1)), b(steps - hits, Group(1, 0));
+    if (a.empty()) a.swap(b);
+    while (b.size() > 1) {
+        const size_t m = a.size() < b.size() ? a.size() : b.size();
+        std::vector<Group> merged, rest;
+        for (size_t i = 0; i < m; ++i) {
+            Group g = a[i];
+            g.insert(g.end(), b[i].begin(), b[i].end());
+            merged.push_back(g);
+        }
+        rest.assign(a.size() > m ? a.begin() + m : b.begin() + m, a.size() > m ? a.end() : b.end());
+        a.swap(merged);
+        b.swap(rest);
+    }
+    Group out;
+    for (const Group& g : a) out.insert(out.end(), g.begin(), g.end());
+    for (const Group& g : b) out.insert(out.end(), g.begin(), g.end());
+    return out;
+}
+
+static bool same_necklace(const std::vector<int>& a, const std::vector<int>& b) {
+    if (a.size() != b.size()) return false;
+    for (size_t r = 0; r < a.size(); ++r) {
+        bool same = true;
+        for (size_t i = 0; i < a.size() && same; ++i) same = a[i] == b[(i + r) % b.size()];
+        if (same) return true;
+    }
+    return false;
+}
+
+static void euclid() {
+    for (u32 n = 1; n <= 16; ++n)
+        for (u32 k = 0; k <= n; ++k) {
+            std::vector<int> ours;
+            u32 count = 0;
+            for (u32 i = 0; i < n; ++i) {
+                ours.push_back(arp::is_hit(i, n, k, 0));
+                count += arp::is_hit(i, n, k, 0);
+            }
+            require(count == k);
+            require(same_necklace(ours, bjorklund(k, n)));
+            if (k) require(ours[0]);
+            for (u32 r = 0; r < n; ++r)
+                for (u32 i = 0; i < n; ++i)
+                    require(arp::is_hit((i + r) % n, n, k, r) == (ours[i] != 0));
+        }
+}
+
+static void parameters_clamp() {
+    Host h;
+    h.configure(R16, arp::Up, 1, 50, 4, 16, 15, 0);
+    const arp::Params p = arp::read_params(h.controls);
+    require(p.steps == 4 && p.hits == 4 && p.rotate == 3 && p.rate == 60 && p.gate == 50 && p.accent == 0);
+    h.configure(R32, arp::Chord, 4, 100, 16, 0, 0, -100);
+    const arp::Params q = arp::read_params(h.controls);
+    require(q.rate == 30 && q.style == arp::Chord && q.octaves == 4 && q.gate == 100 && q.hits == 0 && q.accent == -100);
+}
+
+static void first_note_is_immediate() {
+    Host h;
+    h.configure(R16, arp::Up, 1, 50, 8, 3, 0, 0);
+    h.press(60, 90);
+    require(h.events.empty());
+    h.step();
+    require(h.ons().size() == 1 && h.ons()[0].time == 0 && h.ons()[0].pitch == 60 && h.ons()[0].velocity == 90);
+
+    Host rest;
+    rest.configure(R16, arp::Up, 1, 50, 8, 1, 1, 0);  // the only hit is on step 1
+    rest.press(60);
+    rest.step(60);
+    require(rest.ons().empty());
+    rest.step();
+    require(rest.ons().size() == 1 && rest.ons()[0].time == 60);
+}
+
+static void rates_and_event_drains() {
+    for (u32 rate = 0; rate < 4; ++rate) {
+        Host h;
+        h.configure(rate, arp::Up, 1, 50, 1, 1, 0, 0);
+        h.press(60);
+        h.step(kRateSteps[rate] * 4 + 1);
+        require(h.ons().size() == 5);
+        for (u32 i = 0; i < 5; ++i) require(h.ons()[i].time == i * kRateSteps[rate]);
+    }
+    // Key events between steps do not move the clock.
+    Host h;
+    h.configure(R16, arp::Up, 1, 50, 1, 1, 0, 0);
+    h.press(60);
+    h.step(10);
+    for (u32 i = 0; i < 20; ++i) { h.press(72); h.release(72); }
+    h.step(51);
+    require(h.ons().size() == 2 && h.ons()[1].time == 60);
+}
+
+static void gates() {
+    Host tenth;
+    tenth.configure(R32, arp::Up, 1, 10, 1, 1, 0, 0);
+    tenth.press(60);
+    tenth.step(10);
+    require(tenth.events.size() == 2 && !tenth.events[1].on && tenth.events[1].time == 3);
+
+    Host half;
+    half.configure(R16, arp::Up, 1, 50, 2, 1, 0, 0);
+    half.press(60);
+    half.step(200);
+    require(half.events[1].time == 30 && !half.events[1].on);
+    require(half.ons()[1].time == 120);
+
+    // 100%: the note ends exactly as the next begins, and never overlaps it.
+    Host full;
+    full.configure(R16, arp::Up, 1, 100, 1, 1, 0, 0);
+    full.press(60);
+    full.press(64);
+    for (u32 i = 0; i < 200; ++i) { full.step(); require(full.sounding() <= 1); }
+    require(full.events[1].time == 60 && !full.events[1].on && full.events[1].pitch == 60);
+    require(full.events[2].time == 60 && full.events[2].on && full.events[2].pitch == 64);
+
+    // A faster RATE brings the next hit before the old gate ends: the old note still stops.
+    Host faster;
+    faster.configure(R4, arp::Up, 1, 100, 1, 1, 0, 0);
+    faster.press(60);
+    faster.press(64);
+    faster.step(10);
+    faster.configure(R32, arp::Up, 1, 100, 1, 1, 0, 0);
+    faster.step(21);
+    require(faster.ons().size() == 2 && faster.ons()[1].pitch == 64 && faster.sounding() == 1);
+}
+
+static void styles() {
+    // The first key sounds at once; later keys join after it without a repeat.
+    Host up;
+    up.configure(R32, arp::Up, 2, 50, 1, 1, 0, 0);
+    up.press(64); up.press(60);
+    up.step(30 * 5);
+    require(up.pitches() == Notes({64, 72, 76, 60, 64}));
+
+    Host down;
+    down.configure(R32, arp::Down, 1, 50, 1, 1, 0, 0);
+    down.press(60); down.press(64); down.press(67);
+    down.step(30 * 5);
+    require(down.pitches() == Notes({60, 67, 64, 60, 67}));
+
+    Host updown;
+    updown.configure(R32, arp::UpDown, 1, 50, 1, 1, 0, 0);
+    updown.press(60); updown.press(64); updown.press(67);
+    updown.step(30 * 8);
+    require(updown.pitches() == Notes({60, 64, 67, 64, 60, 64, 67, 64}));
+
+    Host order;
+    order.configure(R32, arp::Order, 2, 50, 1, 1, 0, 0);
+    order.press(67); order.press(60);
+    order.step(30 * 5);
+    require(order.pitches() == Notes({67, 60, 79, 72, 67}));
+
+    Host random;
+    random.configure(R32, arp::Random, 1, 50, 1, 1, 0, 0);
+    random.press(60); random.press(64); random.press(67);
+    random.step(30 * 300);
+    u32 seen[3] = {0, 0, 0};
+    for (u32 pitch : random.pitches()) {
+        require(pitch == 60 || pitch == 64 || pitch == 67);
+        ++seen[pitch == 60 ? 0 : pitch == 64 ? 1 : 2];
+    }
+    require(seen[1] > 50 && seen[2] > 50);
+
+    // Keys an octave apart overlap across octaves: each pitch appears once.
+    Host unique;
+    unique.configure(R32, arp::Up, 2, 50, 1, 1, 0, 0);
+    unique.press(60); unique.press(72);
+    unique.step(30 * 4);
+    require(unique.pitches() == Notes({60, 72, 84, 60}));
+
+    // Nothing above MIDI 127.
+    Host top;
+    top.configure(R32, arp::Up, 4, 50, 1, 1, 0, 0);
+    top.press(120);
+    top.step(30 * 4);
+    require(top.pitches() == Notes({120, 120, 120, 120}));
+}
+
+static void chord_of_eight() {
+    Host h;
+    h.configure(R16, arp::Chord, 2, 100, 1, 1, 0, 0);
+    for (u32 i = 0; i < 8; ++i) h.press(60 + i);
+    h.step(61);
+    // The first key sounded alone; the next hit plays all eight, an octave up.
+    require(h.ons().size() == 9 && h.sounding() == 8);
+    for (u32 i = 1; i < 9; ++i) require(h.ons()[i].time == 60 && h.ons()[i].pitch == 71 + i);
+    require(h.largest_drain == 8);
+    // A full drain must not disturb the clock.
+    h.step(60);
+    require(h.ons().size() == 17 && h.ons()[16].time == 120 && h.ons()[9].pitch == 60);
+    require(h.stale_updates == 0);
+}
+
+static void accents() {
+    require(arp::accented(100, 0) == 100 && arp::accented(100, 100) == 127 && arp::accented(100, 50) == 113);
+    require(arp::accented(100, -50) == 50 && arp::accented(100, -100) == 1 && arp::accented(127, 100) == 127);
+    Host h;
+    h.configure(R32, arp::Up, 1, 50, 4, 2, 0, -50);
+    h.press(60, 100);
+    h.step(30 * 8);  // hits at 0, 60, 120, 180
+    const std::vector<Event> on = h.ons();
+    require(on.size() == 4);
+    require(on[0].velocity == 50 && on[1].velocity == 100 && on[2].velocity == 50 && on[3].velocity == 100);
+}
+
+static void cleanup() {
+    Host h;
+    h.configure(R16, arp::Up, 2, 100, 1, 1, 0, 0);
+    h.press(60); h.press(64);
+    h.step(10);
+    require(h.sounding() == 1);
+    h.release(60);  // its own note stops; the other key carries on
+    require(h.sounding() == 0);
+    h.step(60);
+    require(h.sounding() == 1);
+    h.release(64);
+    require(h.sounding() == 0 && h.state.active == 0);
+    h.step(500);
+    require(h.sounding() == 0 && h.stale_updates == 0);
+
+    // A new first press restarts the pattern at step 0.
+    h.configure(R16, arp::Up, 1, 50, 8, 8, 0, 0);
+    const size_t before = h.ons().size();
+    h.press(62);
+    require(h.state.step == 0);
+    h.step();
+    require(h.ons().size() == before + 1 && h.ons().back().pitch == 62);
+    h.all_notes_off();
+    require(h.sounding() == 0 && h.state.active == 0);
+    h.step(200);
+    require(h.sounding() == 0 && h.stale_updates == 0);
+
+    Host full;
+    full.configure(R16, arp::Up, 1, 50, 1, 1, 0, 0);
+    for (u32 i = 0; i < 9; ++i) full.press(60 + i);
+    require(full.passed_through == 0 && full.held == 8 && !full.find(68));
+    full.release(68);  // the untracked key changes nothing
+    require(full.state.active == 0xff);
+    for (u32 i = 0; i < 8; ++i) full.release(60 + i);
+    full.step(200);
+    require(full.sounding() == 0 && full.stale_updates == 0);
+
+    // The same key again keeps one record and one slot.
+    Host again;
+    again.configure(R16, arp::Up, 1, 50, 1, 1, 0, 0);
+    again.press(60); again.step(5); again.press(60);
+    require(again.sounding() == 0 && again.state.active == 1);
+    again.step(120);
+    again.release(60);
+    require(again.sounding() == 0 && again.state.active == 0);
+}
+
+static void parked_tones_never_sound() {
+    Host h;
+    h.configure(R32, arp::Up, 1, 50, 16, 0, 0, 0);
+    h.press(60); h.press(64);
+    h.step(200000);
+    require(h.events.empty() && h.stale_updates == 0 && h.state.active == 3);
+    // After that long silence the keys still play.
+    h.configure(R32, arp::Up, 1, 50, 1, 1, 0, 0);
+    h.step(31);
+    require(h.ons().size() >= 1);
+
+    // Queued tones of keys that join a playing pattern stay dark too.
+    Host joined;
+    joined.configure(R4, arp::Up, 1, 10, 16, 1, 0, 0);
+    joined.press(60);
+    joined.step(100);
+    joined.press(64);
+    joined.step(70000);
+    for (const Event& on : joined.ons()) require(on.velocity != 1);  // parked tones have velocity 1
+    require(joined.ons().size() > 2 && joined.stale_updates == 0);
+}
+
+static void live_edits() {
+    Host h;
+    h.configure(R32, arp::Up, 1, 50, 16, 16, 0, 0);
+    h.press(60);
+    h.step(30 * 10);
+    require(h.state.step == 9);
+    h.configure(R32, arp::Up, 1, 50, 4, 4, 0, 0);  // the playhead wraps instead of running off
+    h.step(30);
+    require(h.state.step == 0);
+}
+
+static bool terminated(const char* text, u32 size) { return std::memchr(text, 0, size) != nullptr; }
+
+static void screen() {
+    Host h;
+    h.configure(R16, arp::UpDown, 3, 55, 8, 3, 0, 25);
+    player::Display d = {};
+    arp::display(h.state, h.controls, d);
+    const char* const expected[8] = {"1/16", "UP/DN", "3", "55%", "8", "3", "0", "+25%"};
+    for (u32 i = 0; i < 8; ++i) {
+        require(terminated(d.values[i], sizeof d.values[i]));
+        require(std::strcmp(d.values[i], expected[i]) == 0);
+    }
+    require(std::strcmp(d.text, "3/8") == 0);
+    require(d.lit == ((1u << 0) | (1u << 3) | (1u << 6)));  // no playhead without keys
+
+    h.press(61);
+    for (u32 i = 0; i < 60 * 3 + 1; ++i) h.step();
+    player::Display on = {};
+    arp::display(h.state, h.controls, on);
+    require(h.state.step == 3 && std::strcmp(on.text, "C#5") == 0);  // 61, then 73 going up
+    require((on.lit & 0xffffu) == d.lit);
+    require(((on.lit >> 16) & 0xfu) == (1u << 3));         // tick 3 within its quadrant
+    require(((on.lit >> 20) & 0xfu) == (0xfu & ~1u));      // only quadrant 0 stays uncovered
+
+    // Every playhead position leaves exactly one tick uncovered.
+    for (u32 step = 0; step < 16; ++step) {
+        h.state.step = step;
+        player::Display shown = {};
+        arp::display(h.state, h.controls, shown);
+        u32 visible = 0, slot = 0;
+        for (u32 r = 0; r < 4; ++r)
+            for (u32 q = 0; q < 4; ++q)
+                if ((shown.lit >> (16 + r) & 1) && !(shown.lit >> (20 + q) & 1)) { ++visible; slot = 4 * q + r; }
+        require(visible == 1 && slot == step);
+    }
+
+    Host extremes;
+    extremes.configure(R4, arp::Chord, 4, 100, 16, 16, 15, -100);
+    player::Display wide = {};
+    arp::display(extremes.state, extremes.controls, wide);
+    require(std::strcmp(wide.values[7], "-100%") == 0 && std::strcmp(wide.values[3], "100%") == 0);
+    require(std::strcmp(wide.text, "16/16") == 0 && (wide.lit & 0xffffu) == 0xffffu);
+    extremes.configure(R4, arp::Up, 1, 10, 1, 0, 0, 0);
+    player::Display low = {};
+    arp::display(extremes.state, extremes.controls, low);
+    require(std::strcmp(low.values[7], "0%") == 0 && low.lit == 0 && std::strcmp(low.text, "0/1") == 0);
+    arp::State low_note = {};
+    low_note.active = 1; low_note.has_note = 1; low_note.shown_pitch = 0;
+    player::Display bottom = {};
+    arp::display(low_note, extremes.controls, bottom);
+    require(std::strcmp(bottom.text, "C-1") == 0);
+}
+
+int main() {
+    static_assert(sizeof(arp::State) <= player::state_bytes, "State fits the SDK's area");
+    euclid();
+    parameters_clamp();
+    first_note_is_immediate();
+    rates_and_event_drains();
+    gates();
+    styles();
+    chord_of_eight();
+    accents();
+    cleanup();
+    parked_tones_never_sound();
+    live_edits();
+    screen();
+    std::puts("euclidean_arp: all checks passed");
+    return 0;
+}
