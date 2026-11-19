@@ -27,8 +27,10 @@ const u32 kMaxSteps = 16;
 const u32 kDrainLimit = 8;             // the SDK's updates per drain
 const u16 kParkedDelay = 65535;        // player steps before a parked tone would sound
 const u32 kRearmInterval = 32768;      // parked tones are renewed well before that
+const u32 kDefaultChordWindow = 9;     // player steps, about 19 ms at 120 BPM
 
-enum Style { Up, Down, UpDown, Order, Random, Chord };
+enum Style { Up, Down, UpDown, DownUp, Order, Random, Chord };
+const u32 kStyles = 7;
 
 struct Slot {
     u8 root, velocity, next_pitch, next_velocity;
@@ -39,19 +41,22 @@ struct State {
     Slot slots[kSlots];
     u8 pool_pitch[kPool], pool_slot[kPool];
     u32 pool_count, pool_style, pool_octaves, order_counter;
-    u32 step, tick, gate_left, rearm, cursor, chord_octave, rng;
+    u32 step, tick, gate_left, rearm, cursor, chord_octave, rng, start_wait;
     u8 active, sounding, off_mask, on_mask;
-    u8 pool_dirty, accent_ready, started, event_pending;
-    u8 draining, drain_calls, has_note, shown_pitch, descending;
+    u8 pool_dirty, first_hit, started, event_pending;
+    u8 draining, drain_calls, has_note, shown_pitch, returning, start_pending;
+    u8 has_last, last_pitch;  // the note reached last, even if CHANCE skipped it
 };
 
 struct Params {
-    u32 rate, style, octaves, gate, steps, hits, rotate;
-    i32 accent;
+    u32 rate, style, octaves, gate, steps, hits, rotate, chance;
+    bool keep_first;
 };
 
 inline u32 smaller(u32 a, u32 b) { return a < b ? a : b; }
-inline u32 divide(u32 n, u32 d) { return opxy::divide::quotient16(n, d); }
+// quotient16's divide steps fail when both operands share a register, which the
+// compiler chooses when it can prove them equal (100 / 100 gave the "e" in "e00%").
+inline u32 divide(u32 n, u32 d) { return n == d ? 1 : opxy::divide::quotient16(n, d); }
 inline u32 modulo(u32 n, u32 d) { return n - d * divide(n, d); }
 
 inline Params read_params(const Controls& c) {
@@ -59,13 +64,16 @@ inline Params read_params(const Controls& c) {
     static const u16 rates[4] = {240, 120, 60, 30};
     Params p;
     p.rate = rates[choice(c.value[0], 4)];
-    p.style = choice(c.value[1], 6);
+    p.style = choice(c.value[1], kStyles);
     p.octaves = 1 + choice(c.value[2], kOctaves);
     p.gate = 10 + 5 * choice(c.value[3], 19);
     p.steps = 1 + choice(c.value[4], kMaxSteps);
     p.hits = smaller(choice(c.value[5], kMaxSteps + 1), p.steps);
     p.rotate = smaller(choice(c.value[6], kMaxSteps), p.steps - 1);
-    p.accent = 5 * static_cast<i32>(choice(c.value[7], 41)) - 100;
+    // 0..100%, then on past 100% down through 95*..0*, which keep each loop's first hit.
+    const u32 amount = choice(c.value[7], 41);
+    p.keep_first = amount > 20;
+    p.chance = 5 * (p.keep_first ? 40 - amount : amount);
     return p;
 }
 
@@ -73,13 +81,6 @@ inline Params read_params(const Controls& c) {
 inline bool is_hit(u32 step, u32 steps, u32 hits, u32 rotate) {
     if (!hits) return false;
     return modulo(modulo(step + steps - rotate, steps) * hits, steps) < hits;
-}
-
-inline u32 accented(u32 velocity, i32 accent) {
-    u32 v = velocity;
-    if (accent > 0) v += divide((127 - v) * static_cast<u32>(accent), 100);
-    else if (accent < 0) v -= divide(v * static_cast<u32>(-accent), 100);
-    return v < 1 ? 1 : v > 127 ? 127 : v;
 }
 
 inline u32 find_slot(const State& s, u32 note) {
@@ -100,8 +101,8 @@ inline void add_to_pool(State& s, u32 pitch, u32 slot) {
 // joining the arpeggio neither repeats that note nor skips one.
 inline void anchor_cursor(State& s, u32 style) {
     const u32 n = s.pool_count;
-    if (!s.has_note || !n || style == Random || style == Chord) return;
-    const u32 last = s.shown_pitch;
+    if (!s.has_last || !n || style == Random || style == Chord) return;
+    const u32 last = s.last_pitch;
     if (style == Order) {
         for (u32 i = 0; i < n; ++i)
             if (s.pool_pitch[i] == last) s.cursor = i + 1;
@@ -114,10 +115,12 @@ inline void anchor_cursor(State& s, u32 style) {
         s.cursor = above;
     } else if (style == Down) {
         s.cursor = below ? n - below : 0;
-    } else if (s.descending && n > 1) {
-        s.cursor = below ? 2 * n - 2 - (below - 1) : 1;
     } else {
-        s.cursor = above;
+        // DN/UP is UP/DN over the pool read from the top.
+        const u32 before = style == UpDown ? below : n - above;
+        const u32 after = style == UpDown ? above : n - below;
+        if (s.returning && n > 1) s.cursor = before ? 2 * n - 2 - (before - 1) : 1;
+        else s.cursor = after;
     }
 }
 
@@ -169,12 +172,13 @@ inline u32 next_random(State& s) {
 inline u32 next_pool_index(State& s, u32 style) {
     const u32 n = s.pool_count;
     if (style == Random) return ((next_random(s) >> 16) * n) >> 16;
-    const u32 period = style == UpDown && n > 1 ? 2 * n - 2 : n;
+    const u32 period = (style == UpDown || style == DownUp) && n > 1 ? 2 * n - 2 : n;
     if (s.cursor >= period) s.cursor = 0;
     const u32 at = s.cursor++;
     if (style == Down) return n - 1 - at;
-    s.descending = at >= n;
-    return at < n ? at : period - at;
+    s.returning = at >= n;
+    const u32 bounced = at < n ? at : period - at;
+    return style == DownUp ? n - 1 - bounced : bounced;
 }
 
 inline void queue_note(State& s, u32 slot, u32 pitch, u32 velocity) {
@@ -185,10 +189,18 @@ inline void queue_note(State& s, u32 slot, u32 pitch, u32 velocity) {
     s.off_mask &= static_cast<u8>(~bit);  // its Replace already ends the old note
 }
 
+inline bool roll_chance(State& s, u32 chance) {
+    if (chance >= 100) return true;
+    if (!chance) return false;
+    return (((next_random(s) >> 16) * 100) >> 16) < chance;
+}
+
+// A skipped hit still moves the arpeggio on, so the melody keeps its place.
 inline void trigger(State& s, const Params& p) {
     s.off_mask |= s.sounding;
     if (s.pool_dirty || s.pool_style != p.style || s.pool_octaves != p.octaves) rebuild_pool(s, p);
-    const i32 accent = s.accent_ready ? p.accent : 0;
+    const bool play = (p.keep_first && s.first_hit) || roll_chance(s, p.chance);
+    s.first_hit = 0;
     bool any = false;
     u32 lowest = 127;
     if (p.style == Chord) {
@@ -197,7 +209,7 @@ inline void trigger(State& s, const Params& p) {
         for (u32 i = 0; i < kSlots; ++i) {
             if (!(s.active >> i & 1) || s.slots[i].root + shift > 127) continue;
             const u32 pitch = s.slots[i].root + shift;
-            queue_note(s, i, pitch, accented(s.slots[i].velocity, accent));
+            if (play) queue_note(s, i, pitch, s.slots[i].velocity);
             lowest = smaller(lowest, pitch);
             any = true;
         }
@@ -205,24 +217,29 @@ inline void trigger(State& s, const Params& p) {
         const u32 at = next_pool_index(s, p.style);
         const u32 slot = s.pool_slot[at];
         lowest = s.pool_pitch[at];
-        queue_note(s, slot, lowest, accented(s.slots[slot].velocity, accent));
+        if (play) queue_note(s, slot, lowest, s.slots[slot].velocity);
         any = true;
     }
-    s.accent_ready = 0;
     if (!any) return;
+    s.last_pitch = static_cast<u8>(lowest);
+    s.has_last = 1;
+    if (!play) return;
     s.shown_pitch = static_cast<u8>(lowest);
     s.has_note = 1;
     const u32 gate = divide(p.rate * p.gate, 100);
     s.gate_left = gate ? gate : 1;
 }
 
-inline void clock_step(State& s, const Controls& c) {
-    if (!s.active) return;
-    if (!s.started) {  // the step that plays the press's own note
-        s.started = 1;
-        return;
-    }
-    const Params p = read_params(c);
+// How long the first note waits for the rest of a chord: about 20 ms, because
+// the keys of a chord never arrive together and may arrive in any order. Always
+// under half a RATE step, so it cannot reach the next step of the pattern.
+inline u32 chord_window(u32 bpm_x10, u32 rate) {
+    u32 window = bpm_x10 ? divide(bpm_x10, 125) : kDefaultChordWindow;
+    if (window < 1) window = 1;
+    return smaller(window, rate / 2);
+}
+
+inline void advance_clock(State& s, const Params& p) {
     if (s.gate_left && --s.gate_left == 0) s.off_mask |= s.sounding;
     if (++s.rearm >= kRearmInterval) {
         s.rearm = 0;
@@ -230,10 +247,29 @@ inline void clock_step(State& s, const Controls& c) {
     }
     if (++s.tick < p.rate) return;
     s.tick = 0;
+    s.start_pending = 0;
     if (++s.step >= p.steps) {
         s.step = 0;
-        s.accent_ready = 1;
+        s.first_hit = 1;
     }
+    if (is_hit(s.step, p.steps, p.hits, p.rotate)) trigger(s, p);
+}
+
+inline void clock_step(State& s, const Controls& c) {
+    if (!s.active) return;
+    const Params p = read_params(c);
+    if (!s.started) {  // the pattern's clock counts from this step
+        s.started = 1;
+        s.start_wait = chord_window(c.bpm_x10, p.rate);
+    } else {
+        advance_clock(s, p);
+    }
+    if (!s.start_pending) return;
+    if (s.start_wait) {
+        --s.start_wait;
+        return;
+    }
+    s.start_pending = 0;
     if (is_hit(s.step, p.steps, p.hits, p.rotate)) trigger(s, p);
 }
 
@@ -249,7 +285,7 @@ inline void park(Tone& tone, u32 root) {
     tone.delay = kParkedDelay;
 }
 
-bool press(State& s, const Controls& c, u32 note, u32 velocity, Plan& plan) {
+bool press(State& s, const Controls&, u32 note, u32 velocity, Plan& plan) {
     plan.count = 0;
     if (note > 127) return false;
     s.event_pending = 1;
@@ -274,19 +310,9 @@ bool press(State& s, const Controls& c, u32 note, u32 velocity, Plan& plan) {
     if (!first) return true;
 
     s.step = s.tick = s.gate_left = s.rearm = s.cursor = s.chord_octave = 0;
-    s.started = s.has_note = s.descending = 0;
-    s.accent_ready = 1;
+    s.started = s.has_note = s.has_last = s.returning = 0;
+    s.first_hit = s.start_pending = 1;
     if (!s.rng) s.rng = 0x9e3779b9u ^ (note << 8) ^ key.velocity;
-    const Params p = read_params(c);
-    if (is_hit(0, p.steps, p.hits, p.rotate)) trigger(s, p);
-    if (s.on_mask & bit) {
-        plan.tones[0].pitch = key.next_pitch;
-        plan.tones[0].velocity = key.next_velocity;
-        plan.tones[0].delay = 0;
-        s.on_mask &= static_cast<u8>(~bit);
-        s.sounding |= bit;
-    }
-    s.off_mask = 0;
     return true;
 }
 
@@ -363,7 +389,8 @@ inline void show_number(char (&out)[8], u32 value, const char* suffix) {
 
 void display(const State& s, const Controls& c, Display& d) {
     static const char rates[4][5] = {"1/4", "1/8", "1/16", "1/32"};
-    static const char styles[6][6] = {"UP", "DOWN", "UP/DN", "ORDER", "RAND", "CHORD"};
+    // Lower case: a header value has under 60 px, and "CHORD" or "DOWN" would reach the next title.
+    static const char styles[kStyles][6] = {"up", "down", "up/dn", "dn/up", "order", "rand", "chord"};
     static const char notes[12][3] = {"C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"};
     const Params p = read_params(c);
     u32 at = 0;
@@ -375,10 +402,7 @@ void display(const State& s, const Controls& c, Display& d) {
     show_number(d.values[4], p.steps, "");
     show_number(d.values[5], p.hits, "");
     show_number(d.values[6], p.rotate, "");
-    at = 0;
-    if (p.accent) append(d.values[7], sizeof d.values[7], at, p.accent > 0 ? "+" : "-");
-    append_number(d.values[7], sizeof d.values[7], at, static_cast<u32>(p.accent < 0 ? -p.accent : p.accent));
-    append(d.values[7], sizeof d.values[7], at, "%");
+    show_number(d.values[7], p.chance, p.keep_first ? "%*" : "%");
 
     // Dots 0..15 are hits. Dots 16..19 each draw a tick in all four quadrants,
     // and dots 20..23 cover a quadrant's ticks, leaving the one playhead tick.

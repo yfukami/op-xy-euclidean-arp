@@ -9,13 +9,14 @@ Press any encoder to switch pages.
 | Encoder | Page 1 | Page 2 |
 |---|---|---|
 | 1 | RATE: 1/4, 1/8, 1/16, 1/32 | STEPS: 1 to 16 |
-| 2 | STYLE: UP, DOWN, UP/DN, ORDER, RAND, CHORD | HITS: 0 to STEPS |
+| 2 | STYLE: UP, DOWN, UP/DN, DN/UP, ORDER, RAND, CHORD | HITS: 0 to STEPS |
 | 3 | OCTAVE: 1 to 4 | ROTATE: 0 to STEPS - 1 |
-| 4 | GATE: 10% to 100% | ACCENT: -100% to +100% |
+| 4 | GATE: 10% to 100% | CHANCE: 0% to 100%, then 95%* to 0%* |
 
 - HITS and ROTATE stop at their limit for the current STEPS. Turning past it has no effect, and the stored value returns if STEPS grows.
 - The arpeggio moves to its next note on hits only.
-- ACCENT changes the velocity of the first hit played in each pattern cycle.
+- The first note waits about 20 ms after the first key, so every key of a chord counts and STYLE decides which note starts. The pattern's timing still counts from the first key.
+- CHANCE is the probability that each hit plays. Skipped hits still move the arpeggio to its next note. Values marked `*` always play the first hit of each loop.
 - CHORD plays every held key together and moves up one octave per hit, across OCTAVE octaves.
 
 ## Screen
