@@ -8,7 +8,7 @@ Press any encoder to switch pages.
 
 | Encoder | Page 1 | Page 2 |
 |---|---|---|
-| 1 | RATE: 1/4, 1/8, 1/16, 1/32 | STEPS: 1 to 16 |
+| 1 | RATE: 1/2t, 1/4, 1/4t, 1/8, 1/8t, 1/16, 1/16t, 1/32, 1/32t | STEPS: 1 to 16 |
 | 2 | STYLE: UP, DOWN, UP/DN, DN/UP, ORDER, RAND, CHORD | HITS: 0 to STEPS |
 | 3 | OCTAVE: 1 to 4 | ROTATE: 0 to STEPS - 1 |
 | 4 | GATE: 10% to 100% | CHANCE: 0% to 100%, then 95%* to 0%* |

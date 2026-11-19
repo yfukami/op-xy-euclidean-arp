@@ -29,6 +29,7 @@ const u16 kParkedDelay = 65535;        // player steps before a parked tone woul
 const u32 kRearmInterval = 32768;      // parked tones are renewed well before that
 const u32 kDefaultChordWindow = 9;     // player steps, about 19 ms at 120 BPM
 
+const u32 kRates = 9;
 enum Style { Up, Down, UpDown, DownUp, Order, Random, Chord };
 const u32 kStyles = 7;
 
@@ -62,9 +63,10 @@ inline u32 modulo(u32 n, u32 d) { return n - d * divide(n, d); }
 
 inline Params read_params(const Controls& c) {
     using opxy::player::choice;
-    static const u16 rates[4] = {240, 120, 60, 30};
+    // Nine choices, so that projects saved with 1/4, 1/8, 1/16 and 1/32 keep them.
+    static const u16 rates[kRates] = {320, 240, 160, 120, 80, 60, 40, 30, 20};
     Params p;
-    p.rate = rates[choice(c.value[0], 4)];
+    p.rate = rates[choice(c.value[0], kRates)];
     p.style = choice(c.value[1], kStyles);
     p.octaves = 1 + choice(c.value[2], kOctaves);
     p.gate = 10 + 5 * choice(c.value[3], 19);
@@ -429,13 +431,13 @@ inline void show_number(char (&out)[8], u32 value, const char* suffix) {
 }
 
 void display(const State& s, const Controls& c, Display& d) {
-    static const char rates[4][5] = {"1/4", "1/8", "1/16", "1/32"};
+    static const char rates[kRates][6] = {"1/2t", "1/4", "1/4t", "1/8", "1/8t", "1/16", "1/16t", "1/32", "1/32t"};
     // Lower case: a header value has under 60 px, and "CHORD" or "DOWN" would reach the next title.
     static const char styles[kStyles][6] = {"up", "down", "up/dn", "dn/up", "order", "rand", "chord"};
     static const char notes[12][3] = {"C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"};
     const Params p = read_params(c);
     u32 at = 0;
-    append(d.values[0], sizeof d.values[0], at, rates[opxy::player::choice(c.value[0], 4)]);
+    append(d.values[0], sizeof d.values[0], at, rates[opxy::player::choice(c.value[0], kRates)]);
     at = 0;
     append(d.values[1], sizeof d.values[1], at, styles[p.style]);
     show_number(d.values[2], p.octaves, "");

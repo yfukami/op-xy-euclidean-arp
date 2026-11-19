@@ -1,8 +1,8 @@
 #include <cstring>
 #include "harness.hpp"
 
-enum { R4, R8, R16, R32 };
-static const u32 kRateSteps[4] = {240, 120, 60, 30};
+enum { R2T, R4, R4T, R8, R8T, R16, R16T, R32, R32T };
+static const u32 kRateSteps[arp::kRates] = {320, 240, 160, 120, 80, 60, 40, 30, 20};
 static const u32 kStart = 0;  // the first note sounds on the next player step
 typedef std::vector<u32> Notes;
 
@@ -189,7 +189,7 @@ static void first_note_is_prompt() {
 }
 
 static void rates_and_event_drains() {
-    for (u32 rate = 0; rate < 4; ++rate) {
+    for (u32 rate = 0; rate < arp::kRates; ++rate) {
         Host h;
         h.configure(rate, arp::Up, 1, 50, 1, 1, 0, 100);
         h.press(60);
@@ -197,6 +197,36 @@ static void rates_and_event_drains() {
         require(h.ons().size() == 5);
         for (u32 i = 0; i < 5; ++i) require(h.ons()[i].time == (i ? i * kRateSteps[rate] : kStart));
     }
+    // Three triplet notes fill the time of two straight ones, without drift.
+    Host triplet;
+    triplet.configure(R8T, arp::Up, 1, 50, 1, 1, 0, 100);
+    triplet.press(60);
+    triplet.step(240 * 8 + 1);
+    require(triplet.ons().size() == 25 && triplet.ons()[24].time == 240 * 8);
+
+    // Projects saved with the four original rates keep them.
+    const u32 saved[4] = {240, 120, 60, 30};
+    for (u32 i = 0; i < 4; ++i) {
+        Host old;
+        old.set(0, i, 4);
+        require(arp::read_params(old.controls).rate == saved[i]);
+    }
+
+    // Every rate's caption, and a short gate at the fastest rate.
+    const char* const names[arp::kRates] = {"1/2t", "1/4", "1/4t", "1/8", "1/8t", "1/16", "1/16t", "1/32", "1/32t"};
+    for (u32 i = 0; i < arp::kRates; ++i) {
+        Host shown;
+        shown.configure(i, arp::Up, 1, 50, 1, 1, 0, 100);
+        player::Display d = {};
+        arp::display(shown.state, shown.controls, d);
+        require(std::strcmp(d.values[0], names[i]) == 0);
+    }
+    Host shortest;
+    shortest.configure(R32T, arp::Up, 1, 10, 1, 1, 0, 100);
+    shortest.press(60);
+    shortest.step(10);
+    require(shortest.events.size() == 2 && !shortest.events[1].on && shortest.events[1].time == 2);
+
     // Key events between steps do not move the clock.
     Host h;
     h.configure(R16, arp::Up, 1, 50, 1, 1, 0, 100);

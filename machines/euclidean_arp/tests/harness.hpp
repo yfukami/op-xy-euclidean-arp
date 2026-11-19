@@ -39,7 +39,7 @@ struct Host {
     }
     void configure(u32 rate, u32 style, u32 octaves, u32 gate_percent, u32 steps, u32 hits, u32 rotate, u32 chance,
                    bool keep_first = false) {
-        set(0, rate, 4); set(1, style, arp::kStyles); set(2, octaves - 1, 4); set(3, (gate_percent - 10) / 5, 19);
+        set(0, rate, arp::kRates); set(1, style, arp::kStyles); set(2, octaves - 1, 4); set(3, (gate_percent - 10) / 5, 19);
         set(4, steps - 1, 16); set(5, hits, 17); set(6, rotate, 16); set(7, keep_first ? 40 - chance / 5 : chance / 5, 41);
     }
 
