@@ -9,7 +9,7 @@
 #include <opxy/divide.hpp>
 #include <opxy/player.hpp>
 
-namespace euclidean_arp {
+namespace euclid_arp {
 using opxy::i32;
 using opxy::u8;
 using opxy::u16;
@@ -44,7 +44,8 @@ struct State {
     u32 step, tick, gate_left, rearm, cursor, chord_octave, rng, start_wait;
     u8 active, sounding, off_mask, on_mask;
     u8 pool_dirty, first_hit, started, event_pending;
-    u8 draining, drain_calls, has_note, shown_pitch, returning, start_pending;
+    u8 draining, drain_calls, has_note, shown_pitch, returning;
+    u8 start_hit, start_played, regroup;
     u8 has_last, last_pitch;  // the note reached last, even if CHANCE skipped it
 };
 
@@ -196,9 +197,19 @@ inline bool roll_chance(State& s, u32 chance) {
 }
 
 // A skipped hit still moves the arpeggio on, so the melody keeps its place.
-inline void trigger(State& s, const Params& p) {
-    s.off_mask |= s.sounding;
+inline void ensure_pool(State& s, const Params& p) {
     if (s.pool_dirty || s.pool_style != p.style || s.pool_octaves != p.octaves) rebuild_pool(s, p);
+}
+
+inline void start_gate(State& s, const Params& p) {
+    const u32 gate = divide(p.rate * p.gate, 100);
+    s.gate_left = gate ? gate : 1;
+}
+
+// Returns whether the hit sounded.
+inline bool trigger(State& s, const Params& p) {
+    s.off_mask |= s.sounding;
+    ensure_pool(s, p);
     const bool play = (p.keep_first && s.first_hit) || roll_chance(s, p.chance);
     s.first_hit = 0;
     bool any = false;
@@ -220,19 +231,45 @@ inline void trigger(State& s, const Params& p) {
         if (play) queue_note(s, slot, lowest, s.slots[slot].velocity);
         any = true;
     }
-    if (!any) return;
+    if (!any) return false;
     s.last_pitch = static_cast<u8>(lowest);
     s.has_last = 1;
-    if (!play) return;
+    if (!play) return false;
     s.shown_pitch = static_cast<u8>(lowest);
     s.has_note = 1;
-    const u32 gate = divide(p.rate * p.gate, 100);
-    s.gate_left = gate ? gate : 1;
+    start_gate(s, p);
+    return true;
 }
 
-// How long the first note waits for the rest of a chord: about 20 ms, because
-// the keys of a chord never arrive together and may arrive in any order. Always
-// under half a RATE step, so it cannot reach the next step of the pattern.
+// A key landed just after the first hit: choose that hit again with it included.
+inline void regroup_first_hit(State& s, const Params& p) {
+    if (p.style == Random) return;
+    if (p.style == Chord) {
+        if (!s.start_played) return;
+        for (u32 i = 0; i < kSlots; ++i)
+            if ((s.active >> i & 1) && !(s.sounding >> i & 1)) queue_note(s, i, s.slots[i].root, s.slots[i].velocity);
+        return;
+    }
+    s.has_last = 0;
+    s.pool_dirty = 1;
+    s.cursor = s.returning = 0;
+    ensure_pool(s, p);
+    if (!s.pool_count) return;
+    const u32 at = next_pool_index(s, p.style);
+    const u32 slot = s.pool_slot[at], pitch = s.pool_pitch[at];
+    s.last_pitch = static_cast<u8>(pitch);
+    s.has_last = 1;
+    if (!s.start_played) return;
+    if ((s.sounding >> slot & 1) && s.shown_pitch == pitch) return;  // already the right note
+    s.off_mask |= s.sounding;
+    queue_note(s, slot, pitch, s.slots[slot].velocity);
+    s.shown_pitch = static_cast<u8>(pitch);
+    start_gate(s, p);
+}
+
+// How long after the first note a late key can still change it: about 20 ms,
+// because hand-played chords never land together. Always under half a RATE
+// step, so it cannot reach the next step of the pattern.
 inline u32 chord_window(u32 bpm_x10, u32 rate) {
     u32 window = bpm_x10 ? divide(bpm_x10, 125) : kDefaultChordWindow;
     if (window < 1) window = 1;
@@ -247,7 +284,7 @@ inline void advance_clock(State& s, const Params& p) {
     }
     if (++s.tick < p.rate) return;
     s.tick = 0;
-    s.start_pending = 0;
+    s.start_wait = s.regroup = 0;
     if (++s.step >= p.steps) {
         s.step = 0;
         s.first_hit = 1;
@@ -258,19 +295,20 @@ inline void advance_clock(State& s, const Params& p) {
 inline void clock_step(State& s, const Controls& c) {
     if (!s.active) return;
     const Params p = read_params(c);
-    if (!s.started) {  // the pattern's clock counts from this step
+    if (!s.started) {  // every key that arrived with the first is already held
         s.started = 1;
         s.start_wait = chord_window(c.bpm_x10, p.rate);
-    } else {
-        advance_clock(s, p);
-    }
-    if (!s.start_pending) return;
-    if (s.start_wait) {
-        --s.start_wait;
+        s.start_hit = is_hit(s.step, p.steps, p.hits, p.rotate);
+        s.start_played = s.start_hit && trigger(s, p);
         return;
     }
-    s.start_pending = 0;
-    if (is_hit(s.step, p.steps, p.hits, p.rotate)) trigger(s, p);
+    advance_clock(s, p);
+    if (!s.start_wait) return;
+    --s.start_wait;
+    if (s.regroup) {
+        s.regroup = 0;
+        if (s.start_hit) regroup_first_hit(s, p);
+    }
 }
 
 inline u32 lowest_bit(u32 mask) {
@@ -307,11 +345,14 @@ bool press(State& s, const Controls&, u32 note, u32 velocity, Plan& plan) {
     s.pool_dirty = 1;
     plan.count = 1;
     park(plan.tones[0], note);
-    if (!first) return true;
+    if (!first) {
+        if (s.start_wait) s.regroup = 1;
+        return true;
+    }
 
-    s.step = s.tick = s.gate_left = s.rearm = s.cursor = s.chord_octave = 0;
-    s.started = s.has_note = s.has_last = s.returning = 0;
-    s.first_hit = s.start_pending = 1;
+    s.step = s.tick = s.gate_left = s.rearm = s.cursor = s.chord_octave = s.start_wait = 0;
+    s.started = s.has_note = s.has_last = s.returning = s.regroup = 0;
+    s.first_hit = 1;
     if (!s.rng) s.rng = 0x9e3779b9u ^ (note << 8) ^ key.velocity;
     return true;
 }
@@ -426,4 +467,4 @@ void display(const State& s, const Controls& c, Display& d) {
         append_number(d.text, sizeof d.text, at, p.steps);
     }
 }
-}  // namespace euclidean_arp
+}  // namespace euclid_arp

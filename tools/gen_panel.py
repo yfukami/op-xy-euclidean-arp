@@ -11,7 +11,7 @@ import argparse
 import math
 from pathlib import Path
 
-PREFIX = 'euclidean_arp'
+PREFIX = 'euclid_arp'
 OUTPUT = Path(__file__).resolve().parents[1] / 'machines/euclidean_arp/panel.svg.fragment'
 CX, CY = 240, 130
 RING, HIT_R, REST_R = 74, 6, 2.5

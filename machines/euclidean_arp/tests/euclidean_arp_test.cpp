@@ -3,7 +3,7 @@
 
 enum { R4, R8, R16, R32 };
 static const u32 kRateSteps[4] = {240, 120, 60, 30};
-static const u32 kStart = arp::kDefaultChordWindow;  // the harness reports no tempo
+static const u32 kStart = 0;  // the first note sounds on the next player step
 typedef std::vector<u32> Notes;
 
 static std::vector<int> bjorklund(u32 hits, u32 steps) {
@@ -85,7 +85,7 @@ static void chord_sets_the_first_note() {
     }
     require(first_notes(arp::Order, {67, 60, 64}, 4) == Notes({67, 60, 64, 67}));
 
-    // Keys spread across the window still count; a later key joins without restarting.
+    // A later key inside the window replaces the first note; after it, a key just joins.
     Host spread;
     spread.configure(R16, arp::Up, 1, 50, 1, 1, 0, 100);
     spread.press(67);
@@ -94,10 +94,44 @@ static void chord_sets_the_first_note() {
     spread.step(4);
     spread.press(60);
     spread.step(2);
-    require(spread.pitches() == Notes({60}) && spread.ons()[0].time == kStart);
+    require(spread.pitches() == Notes({67, 64, 60}) && spread.ons()[2].time == 8 && spread.sounding() == 1);
     spread.press(55);
     spread.step(120);
-    require(spread.pitches() == Notes({60, 64, 67}));
+    require(spread.pitches() == Notes({67, 64, 60, 64, 67}));
+
+    // The right first note is not struck twice, and a chord only adds the late key.
+    Host same;
+    same.configure(R16, arp::Up, 1, 50, 1, 1, 0, 100);
+    same.press(60);
+    same.step(2);
+    same.press(64);
+    same.step(10);
+    require(same.pitches() == Notes({60}) && same.sounding() == 1);
+    Host joined;
+    joined.configure(R16, arp::Chord, 1, 50, 1, 1, 0, 100);
+    joined.press(60);
+    joined.step(2);
+    joined.press(64);
+    joined.step(10);
+    require(joined.pitches() == Notes({60, 64}) && joined.sounding() == 2);
+
+    // A key after the window never changes the note that is playing.
+    Host late;
+    late.configure(R16, arp::Up, 1, 50, 1, 1, 0, 100);
+    late.press(67);
+    late.step(arp::kDefaultChordWindow + 1);
+    late.press(60);
+    late.step(10);
+    require(late.pitches() == Notes({67}));
+
+    // A first hit CHANCE skipped stays silent when a key lands late.
+    Host skipped;
+    skipped.configure(R16, arp::Up, 1, 50, 1, 1, 0, 0);
+    skipped.press(67);
+    skipped.step(2);
+    skipped.press(60);
+    skipped.step(10);
+    require(skipped.events.empty());
 
     require(arp::chord_window(1200, 240) == 9 && arp::chord_window(600, 240) == 4);
     require(arp::chord_window(3000, 30) == 15 && arp::chord_window(200, 240) == 1 && arp::chord_window(0, 240) == 9);
@@ -513,6 +547,6 @@ int main() {
     parked_tones_never_sound();
     live_edits();
     screen();
-    std::puts("euclidean_arp: all checks passed");
+    std::puts("euclid_arp: all checks passed");
     return 0;
 }

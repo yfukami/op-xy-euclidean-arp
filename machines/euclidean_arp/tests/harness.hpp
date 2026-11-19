@@ -10,7 +10,7 @@
 
 using opxy::i32;
 using opxy::u32;
-namespace arp = euclidean_arp;
+namespace arp = euclid_arp;
 namespace player = opxy::player;
 
 struct Event {

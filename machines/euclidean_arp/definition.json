@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "id": "euclidean_arp",
+  "id": "euclid_arp",
   "name": "Euclidean Arp",
   "press": "page",
   "resources": {},

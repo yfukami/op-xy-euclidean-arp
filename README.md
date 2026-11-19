@@ -15,7 +15,7 @@ Press any encoder to switch pages.
 
 - HITS and ROTATE stop at their limit for the current STEPS. Turning past it has no effect, and the stored value returns if STEPS grows.
 - The arpeggio moves to its next note on hits only.
-- The first note waits about 20 ms after the first key, so every key of a chord counts and STYLE decides which note starts. The pattern's timing still counts from the first key.
+- The first note plays on the next player step, using every key that has arrived, so STYLE decides which note of a sequenced chord starts. For about 20 ms after that, a late key from a hand-played chord can still replace the first note.
 - CHANCE is the probability that each hit plays. Skipped hits still move the arpeggio to its next note. Values marked `*` always play the first hit of each loop.
 - CHORD plays every held key together and moves up one octave per hit, across OCTAVE octaves.
 
