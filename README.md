@@ -43,3 +43,7 @@ python3 tools/gen_panel.py --state 5,8,3 --note C#4 --out /tmp/ring.svg
 Running `python3 tools/gen_panel.py` with no arguments regenerates `panel.svg.fragment`.
 
 Device checks are in [QA.md](QA.md).
+
+## License
+
+MIT. See [LICENSE](LICENSE).
