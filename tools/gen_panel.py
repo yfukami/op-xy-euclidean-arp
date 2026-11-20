@@ -46,6 +46,22 @@ def outline(points):
     return 'M' + ' L'.join(f'{n(x)} {n(y)}' for x, y in points) + ' Z'
 
 
+# Every shape is a path of straight lines: the OP-XY drew none of the <circle>
+# elements an earlier version used, while these paths and the text showed.
+def disc(radius, sides):
+    return outline([polar(radius, i * 360 / sides) for i in range(sides)])
+
+
+def ring(radius, width, segments=64, gap=0.8):
+    """A thin circle as separate short quads, so no two subpaths share a point."""
+    parts = []
+    for i in range(segments):
+        a, b = i * 360 / segments, (i + 1) * 360 / segments - gap
+        parts.append(outline([polar(radius - width / 2, a), polar(radius + width / 2, a),
+                              polar(radius + width / 2, b), polar(radius - width / 2, b)]))
+    return ' '.join(parts)
+
+
 def tick(slot):
     a = slot_angle(slot)
     side = a + 90
@@ -69,7 +85,7 @@ def dots():
     result = []
     for slot in range(SLOTS):
         x, y = polar(RING, slot_angle(slot))
-        result.append((slot, f'<circle id="{PREFIX}_dot_{slot}" {at(CX + x, CY + y)} r="{HIT_R}" {paint("#FFFFFF")}/>'))
+        result.append((slot, f'<path id="{PREFIX}_dot_{slot}" {at(CX + x, CY + y)} d="{disc(HIT_R, 16)}" {paint("#FFFFFF")}/>'))
     for r in range(4):
         d = ' '.join(tick(r + 4 * q) for q in range(4))
         result.append((16 + r, f'<path id="{PREFIX}_dot_{16 + r}" {at(CX, CY)} d="{d}" {paint("#FFFFFF")}/>'))
@@ -79,10 +95,10 @@ def dots():
 
 
 def static_art():
-    art = [f'<circle {at(CX, CY)} r="{RING}" fill="none" stroke="#3A3A3A" stroke-width="1"/>']
+    art = [f'<path {at(CX, CY)} d="{ring(RING, 1.2)}" fill="#4A4A4A" stroke="#4A4A4A" stroke-width="0.2"/>']
     for slot in range(SLOTS):
         x, y = polar(RING, slot_angle(slot))
-        art.append(f'<circle {at(CX + x, CY + y)} r="{REST_R}" {paint("#777777")}/>')
+        art.append(f'<path {at(CX + x, CY + y)} d="{disc(REST_R, 8)}" {paint("#888888")}/>')
     return art
 
 
