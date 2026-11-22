@@ -1,0 +1,230 @@
+{
+  "schema": 1,
+  "id": "chained_arp",
+  "name": "Chain Arp",
+  "press": "page",
+  "resources": {},
+  "presets": {},
+  "parameters": [
+    {
+      "id": "arp_1",
+      "label": "ARP 1",
+      "default": 0.071429,
+      "mapping": {
+        "kind": "enum",
+        "labels": [
+          "OFF",
+          "UP",
+          "DOWN",
+          "UP-DN",
+          "DN-UP",
+          "UPDN+",
+          "DNUP+",
+          "ORDER",
+          "CONV",
+          "DIVRG",
+          "PINKY",
+          "THUMB",
+          "STAIR",
+          "STU-",
+          "STD-",
+          "STD+",
+          "SHUF",
+          "RAND",
+          "DRUNK",
+          "CHORD",
+          "CHD-1"
+        ]
+      },
+      "display": "enum"
+    },
+    {
+      "id": "arp_2",
+      "label": "ARP 2",
+      "default": 0.119048,
+      "mapping": {
+        "kind": "enum",
+        "labels": [
+          "OFF",
+          "UP",
+          "DOWN",
+          "UP-DN",
+          "DN-UP",
+          "UPDN+",
+          "DNUP+",
+          "ORDER",
+          "CONV",
+          "DIVRG",
+          "PINKY",
+          "THUMB",
+          "STAIR",
+          "STU-",
+          "STD-",
+          "STD+",
+          "SHUF",
+          "RAND",
+          "DRUNK",
+          "CHORD",
+          "CHD-1"
+        ]
+      },
+      "display": "enum"
+    },
+    {
+      "id": "arp_3",
+      "label": "ARP 3",
+      "default": 0.02381,
+      "mapping": {
+        "kind": "enum",
+        "labels": [
+          "OFF",
+          "UP",
+          "DOWN",
+          "UP-DN",
+          "DN-UP",
+          "UPDN+",
+          "DNUP+",
+          "ORDER",
+          "CONV",
+          "DIVRG",
+          "PINKY",
+          "THUMB",
+          "STAIR",
+          "STU-",
+          "STD-",
+          "STD+",
+          "SHUF",
+          "RAND",
+          "DRUNK",
+          "CHORD",
+          "CHD-1"
+        ]
+      },
+      "display": "enum"
+    },
+    {
+      "id": "arp_4",
+      "label": "ARP 4",
+      "default": 0.02381,
+      "mapping": {
+        "kind": "enum",
+        "labels": [
+          "OFF",
+          "UP",
+          "DOWN",
+          "UP-DN",
+          "DN-UP",
+          "UPDN+",
+          "DNUP+",
+          "ORDER",
+          "CONV",
+          "DIVRG",
+          "PINKY",
+          "THUMB",
+          "STAIR",
+          "STU-",
+          "STD-",
+          "STD+",
+          "SHUF",
+          "RAND",
+          "DRUNK",
+          "CHORD",
+          "CHD-1"
+        ]
+      },
+      "display": "enum"
+    },
+    {
+      "id": "rate",
+      "label": "RATE",
+      "default": 0.611111,
+      "mapping": {
+        "kind": "enum",
+        "labels": [
+          "1-2T",
+          "1-4",
+          "1-4T",
+          "1-8",
+          "1-8T",
+          "1-16",
+          "1-16T",
+          "1-32",
+          "1-32T"
+        ]
+      },
+      "display": "enum"
+    },
+    {
+      "id": "gate",
+      "label": "GATE",
+      "default": 0.447368,
+      "mapping": {
+        "kind": "enum",
+        "labels": [
+          "10",
+          "15",
+          "20",
+          "25",
+          "30",
+          "35",
+          "40",
+          "45",
+          "50",
+          "55",
+          "60",
+          "65",
+          "70",
+          "75",
+          "80",
+          "85",
+          "90",
+          "95",
+          "100"
+        ]
+      },
+      "display": "enum"
+    },
+    {
+      "id": "octave",
+      "label": "OCTAVE",
+      "default": 0.125,
+      "mapping": {
+        "kind": "enum",
+        "labels": [
+          "1",
+          "2",
+          "3",
+          "4"
+        ]
+      },
+      "display": "enum"
+    },
+    {
+      "id": "cycles",
+      "label": "CYCLES",
+      "default": 0.09375,
+      "mapping": {
+        "kind": "enum",
+        "labels": [
+          "1",
+          "2",
+          "3",
+          "4",
+          "5",
+          "6",
+          "7",
+          "8",
+          "1L",
+          "2L",
+          "3L",
+          "4L",
+          "5L",
+          "6L",
+          "7L",
+          "8L"
+        ]
+      },
+      "display": "enum"
+    }
+  ]
+}

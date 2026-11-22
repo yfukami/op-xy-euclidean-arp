@@ -1,0 +1,48 @@
+<g id="chained_arp_panel">
+<path transform="matrix(1 0 0 1 129 117)" d="M0 0 L18 0 L18 2 L0 2 Z" fill="#666666" stroke="#666666" stroke-width="1"/>
+<path transform="matrix(1 0 0 1 159 117)" d="M0 0 L18 0 L18 2 L0 2 Z" fill="#666666" stroke="#666666" stroke-width="1"/>
+<path transform="matrix(1 0 0 1 189 117)" d="M0 0 L18 0 L18 2 L0 2 Z" fill="#666666" stroke="#666666" stroke-width="1"/>
+<path transform="matrix(1 0 0 1 219 117)" d="M0 0 L18 0 L18 2 L0 2 Z" fill="#666666" stroke="#666666" stroke-width="1"/>
+<path transform="matrix(1 0 0 1 249 117)" d="M0 0 L18 0 L18 2 L0 2 Z" fill="#666666" stroke="#666666" stroke-width="1"/>
+<path transform="matrix(1 0 0 1 279 117)" d="M0 0 L18 0 L18 2 L0 2 Z" fill="#666666" stroke="#666666" stroke-width="1"/>
+<path transform="matrix(1 0 0 1 309 117)" d="M0 0 L18 0 L18 2 L0 2 Z" fill="#666666" stroke="#666666" stroke-width="1"/>
+<path transform="matrix(1 0 0 1 339 117)" d="M0 0 L18 0 L18 2 L0 2 Z" fill="#666666" stroke="#666666" stroke-width="1"/>
+<path transform="matrix(1 0 0 1 72 151)" d="M0 0 L22 0 L22 2 L0 2 Z" fill="#666666" stroke="#666666" stroke-width="1"/>
+<path transform="matrix(1 0 0 1 101 151)" d="M0 0 L22 0 L22 2 L0 2 Z" fill="#666666" stroke="#666666" stroke-width="1"/>
+<path transform="matrix(1 0 0 1 130 151)" d="M0 0 L22 0 L22 2 L0 2 Z" fill="#666666" stroke="#666666" stroke-width="1"/>
+<path transform="matrix(1 0 0 1 159 151)" d="M0 0 L22 0 L22 2 L0 2 Z" fill="#666666" stroke="#666666" stroke-width="1"/>
+<path transform="matrix(1 0 0 1 188 151)" d="M0 0 L22 0 L22 2 L0 2 Z" fill="#666666" stroke="#666666" stroke-width="1"/>
+<path transform="matrix(1 0 0 1 217 151)" d="M0 0 L22 0 L22 2 L0 2 Z" fill="#666666" stroke="#666666" stroke-width="1"/>
+<path transform="matrix(1 0 0 1 246 151)" d="M0 0 L22 0 L22 2 L0 2 Z" fill="#666666" stroke="#666666" stroke-width="1"/>
+<path transform="matrix(1 0 0 1 275 151)" d="M0 0 L22 0 L22 2 L0 2 Z" fill="#666666" stroke="#666666" stroke-width="1"/>
+<path transform="matrix(1 0 0 1 304 151)" d="M0 0 L22 0 L22 2 L0 2 Z" fill="#666666" stroke="#666666" stroke-width="1"/>
+<path transform="matrix(1 0 0 1 333 151)" d="M0 0 L22 0 L22 2 L0 2 Z" fill="#666666" stroke="#666666" stroke-width="1"/>
+<path transform="matrix(1 0 0 1 362 151)" d="M0 0 L22 0 L22 2 L0 2 Z" fill="#666666" stroke="#666666" stroke-width="1"/>
+<path transform="matrix(1 0 0 1 391 151)" d="M0 0 L22 0 L22 2 L0 2 Z" fill="#666666" stroke="#666666" stroke-width="1"/>
+<text transform="matrix(1 0 0 1 44 111)" fill="#8A8A8A" font-family="UniversNextPro-Light" font-size="13">cycle</text>
+<path id="chained_arp_dot_0" transform="matrix(1 0 0 1 12 42)" d="M0 0 L96 0 L96 4 L0 4 Z" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1"/>
+<path id="chained_arp_dot_1" transform="matrix(1 0 0 1 132 42)" d="M0 0 L96 0 L96 4 L0 4 Z" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1"/>
+<path id="chained_arp_dot_2" transform="matrix(1 0 0 1 252 42)" d="M0 0 L96 0 L96 4 L0 4 Z" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1"/>
+<path id="chained_arp_dot_3" transform="matrix(1 0 0 1 372 42)" d="M0 0 L96 0 L96 4 L0 4 Z" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1"/>
+<path id="chained_arp_dot_4" transform="matrix(1 0 0 1 129 96)" d="M0 0 L18 0 L18 18 L0 18 Z" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1"/>
+<path id="chained_arp_dot_5" transform="matrix(1 0 0 1 159 96)" d="M0 0 L18 0 L18 18 L0 18 Z" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1"/>
+<path id="chained_arp_dot_6" transform="matrix(1 0 0 1 189 96)" d="M0 0 L18 0 L18 18 L0 18 Z" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1"/>
+<path id="chained_arp_dot_7" transform="matrix(1 0 0 1 219 96)" d="M0 0 L18 0 L18 18 L0 18 Z" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1"/>
+<path id="chained_arp_dot_8" transform="matrix(1 0 0 1 249 96)" d="M0 0 L18 0 L18 18 L0 18 Z" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1"/>
+<path id="chained_arp_dot_9" transform="matrix(1 0 0 1 279 96)" d="M0 0 L18 0 L18 18 L0 18 Z" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1"/>
+<path id="chained_arp_dot_10" transform="matrix(1 0 0 1 309 96)" d="M0 0 L18 0 L18 18 L0 18 Z" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1"/>
+<path id="chained_arp_dot_11" transform="matrix(1 0 0 1 339 96)" d="M0 0 L18 0 L18 18 L0 18 Z" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1"/>
+<path id="chained_arp_dot_12" transform="matrix(1 0 0 1 72 134)" d="M0 0 L22 0 L22 14 L0 14 Z" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1"/>
+<path id="chained_arp_dot_13" transform="matrix(1 0 0 1 101 134)" d="M0 0 L22 0 L22 14 L0 14 Z" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1"/>
+<path id="chained_arp_dot_14" transform="matrix(1 0 0 1 130 134)" d="M0 0 L22 0 L22 14 L0 14 Z" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1"/>
+<path id="chained_arp_dot_15" transform="matrix(1 0 0 1 159 134)" d="M0 0 L22 0 L22 14 L0 14 Z" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1"/>
+<path id="chained_arp_dot_16" transform="matrix(1 0 0 1 188 134)" d="M0 0 L22 0 L22 14 L0 14 Z" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1"/>
+<path id="chained_arp_dot_17" transform="matrix(1 0 0 1 217 134)" d="M0 0 L22 0 L22 14 L0 14 Z" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1"/>
+<path id="chained_arp_dot_18" transform="matrix(1 0 0 1 246 134)" d="M0 0 L22 0 L22 14 L0 14 Z" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1"/>
+<path id="chained_arp_dot_19" transform="matrix(1 0 0 1 275 134)" d="M0 0 L22 0 L22 14 L0 14 Z" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1"/>
+<path id="chained_arp_dot_20" transform="matrix(1 0 0 1 304 134)" d="M0 0 L22 0 L22 14 L0 14 Z" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1"/>
+<path id="chained_arp_dot_21" transform="matrix(1 0 0 1 333 134)" d="M0 0 L22 0 L22 14 L0 14 Z" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1"/>
+<path id="chained_arp_dot_22" transform="matrix(1 0 0 1 362 134)" d="M0 0 L22 0 L22 14 L0 14 Z" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1"/>
+<path id="chained_arp_dot_23" transform="matrix(1 0 0 1 391 134)" d="M0 0 L22 0 L22 14 L0 14 Z" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1"/>
+<text id="chained_arp_text" transform="matrix(1 0 0 1 240 190)" fill="#FFFFFF" text-anchor="middle" font-family="UniversNextPro-Light" font-size="26">ready</text>
+</g>

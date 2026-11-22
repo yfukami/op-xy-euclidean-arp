@@ -1,0 +1,6 @@
+{
+  "schema": 1,
+  "sdk": "1.16",
+  "kind": "player",
+  "description": "Four arpeggiator slots in a chain: each plays its pattern for CYCLES cycles, then hands over to the next."
+}
