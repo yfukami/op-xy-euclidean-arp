@@ -3,7 +3,8 @@
 
 enum { R2T, R4, R4T, R8, R8T, R16, R16T, R32, R32T };
 static const u32 kRateSteps[arp::kRates] = {320, 240, 160, 120, 80, 60, 40, 30, 20};
-static const u32 kStart = 0;  // the first note sounds on the next player step
+static const u32 kStart = arp::kDefaultChordWindow;  // a key alone waits about 15 ms (no tempo: 7 steps)
+static const u32 kTogether = 0;                       // keys arriving together start at once
 typedef std::vector<u32> Notes;
 
 static std::vector<int> bjorklund(u32 hits, u32 steps) {
@@ -85,46 +86,47 @@ static void chord_sets_the_first_note() {
     }
     require(first_notes(arp::Order, {67, 60, 64}, 4) == Notes({67, 60, 64, 67}));
 
-    // A later key inside the window replaces the first note; after it, a key just joins.
+    // A key arriving alone waits about 15 ms: keys landing meanwhile all count, so a
+    // chord played by hand starts on its lowest note, and nothing is struck twice.
     Host spread;
     spread.configure(R16, arp::Up, 1, 50, 1, 1, 0, 100);
     spread.press(67);
-    spread.step(4);
+    spread.step(3);
     spread.press(64);
-    spread.step(4);
-    spread.press(60);
     spread.step(2);
-    require(spread.pitches() == Notes({67, 64, 60}) && spread.ons()[2].time == 8 && spread.sounding() == 1);
-    spread.press(55);
+    spread.press(60);
+    spread.step(3);
+    require(spread.pitches() == Notes({60}) && spread.ons()[0].time == kStart && spread.sounding() == 1);
+    spread.press(55);  // after the first note: it joins from the next step on
     spread.step(120);
-    require(spread.pitches() == Notes({67, 64, 60, 64, 67}));
+    require(spread.pitches() == Notes({60, 64, 67}));
 
-    // The right first note is not struck twice, and a chord only adds the late key.
-    Host same;
-    same.configure(R16, arp::Up, 1, 50, 1, 1, 0, 100);
-    same.press(60);
-    same.step(2);
-    same.press(64);
-    same.step(10);
-    require(same.pitches() == Notes({60}) && same.sounding() == 1);
+    // A lone key waits, then plays; CHORD starts with every key that arrived.
+    Host alone;
+    alone.configure(R16, arp::Up, 1, 50, 1, 1, 0, 100);
+    alone.press(60);
+    alone.step(kStart);
+    require(alone.events.empty());
+    alone.step();
+    require(alone.pitches() == Notes({60}) && alone.ons()[0].time == kStart);
     Host joined;
     joined.configure(R16, arp::Chord, 1, 50, 1, 1, 0, 100);
     joined.press(60);
     joined.step(2);
     joined.press(64);
     joined.step(10);
-    require(joined.pitches() == Notes({60, 64}) && joined.sounding() == 2);
+    require(joined.pitches() == Notes({60, 64}) && joined.ons()[0].time == kStart && joined.sounding() == 2);
 
     // A key after the window never changes the note that is playing.
     Host late;
     late.configure(R16, arp::Up, 1, 50, 1, 1, 0, 100);
     late.press(67);
-    late.step(arp::kDefaultChordWindow + 1);
+    late.step(kStart + 1);
     late.press(60);
     late.step(10);
     require(late.pitches() == Notes({67}));
 
-    // A first hit CHANCE skipped stays silent when a key lands late.
+    // A first hit CHANCE skips stays silent.
     Host skipped;
     skipped.configure(R16, arp::Up, 1, 50, 1, 1, 0, 0);
     skipped.press(67);
@@ -133,8 +135,9 @@ static void chord_sets_the_first_note() {
     skipped.step(10);
     require(skipped.events.empty());
 
-    require(arp::chord_window(1200, 240) == 9 && arp::chord_window(600, 240) == 4);
-    require(arp::chord_window(3000, 30) == 15 && arp::chord_window(200, 240) == 1 && arp::chord_window(0, 240) == 9);
+    // About 15 ms at any tempo: 7 steps at 120 BPM, 3 at 60, and under half a step.
+    require(arp::chord_window(1200, 240) == 7 && arp::chord_window(600, 240) == 3);
+    require(arp::chord_window(3000, 30) == 15 && arp::chord_window(200, 240) == 1 && arp::chord_window(0, 240) == 7);
 }
 
 static void step_sequenced_chord() {
@@ -148,7 +151,7 @@ static void step_sequenced_chord() {
             for (u32 key : keys) h.press(key);
             h.step(240);
             require(h.ons().size() == before + 4);
-            require(h.ons()[before].pitch == 60 && h.ons()[before].time == h.now - 240 + kStart);
+            require(h.ons()[before].pitch == 60 && h.ons()[before].time == h.now - 240 + kTogether);
             require(h.ons()[before + 1].pitch == 64 && h.ons()[before + 2].pitch == 67);
             // The note ends and the same chord returns on the same sequencer tick.
             for (u32 key : keys) h.release(key);
@@ -224,8 +227,8 @@ static void rates_and_event_drains() {
     Host shortest;
     shortest.configure(R32T, arp::Up, 1, 10, 1, 1, 0, 100);
     shortest.press(60);
-    shortest.step(10);
-    require(shortest.events.size() == 2 && !shortest.events[1].on && shortest.events[1].time == 2);
+    shortest.step(kStart + 3);
+    require(shortest.events.size() == 2 && !shortest.events[1].on && shortest.events[1].time == kStart + 2);
 
     // Key events between steps do not move the clock.
     Host h;
@@ -350,7 +353,7 @@ static void chord_of_eight() {
     // The first hit plays all eight keys; the next plays them an octave up.
     require(h.ons().size() == 16 && h.sounding() == 8);
     for (u32 i = 0; i < 8; ++i) {
-        require(h.ons()[i].time == kStart && h.ons()[i].pitch == 60 + i);
+        require(h.ons()[i].time == kTogether && h.ons()[i].pitch == 60 + i);
         require(h.ons()[8 + i].time == 60 && h.ons()[8 + i].pitch == 72 + i);
     }
     require(h.largest_drain == 8);
@@ -389,7 +392,7 @@ static void chance() {
     first.press(60); first.press(64); first.press(67);
     first.step(250);
     require(first.pitches() == Notes({60, 67, 64}));
-    require(first.ons()[0].time == kStart && first.ons()[1].time == 120 && first.ons()[2].time == 240);
+    require(first.ons()[0].time == kTogether && first.ons()[1].time == 120 && first.ons()[2].time == 240);
 
     // A key joining after a skipped hit continues from the skipped note.
     Host joined;
