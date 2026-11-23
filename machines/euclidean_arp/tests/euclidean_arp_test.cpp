@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <cstring>
 #include "harness.hpp"
 
@@ -97,9 +98,9 @@ static void chord_sets_the_first_note() {
     spread.press(60);
     spread.step(3);
     require(spread.pitches() == Notes({60}) && spread.ons()[0].time == kStart && spread.sounding() == 1);
-    spread.press(55);  // after the first note: it joins from the next step on
+    spread.press(55);  // after the first note: it joins from the next step on, by position
     spread.step(120);
-    require(spread.pitches() == Notes({60, 64, 67}));
+    require(spread.pitches() == Notes({60, 60, 64}));  // positions 1 and 2 of 55 60 64 67
 
     // A lone key waits, then plays; CHORD starts with every key that arrived.
     Host alone;
@@ -115,7 +116,7 @@ static void chord_sets_the_first_note() {
     joined.step(2);
     joined.press(64);
     joined.step(10);
-    require(joined.pitches() == Notes({60, 64}) && joined.ons()[0].time == kStart && joined.sounding() == 2);
+    require(joined.pitches() == Notes({64, 60}) && joined.ons()[0].time == kStart && joined.sounding() == 2);  // lowest last
 
     // A key after the window never changes the note that is playing.
     Host late;
@@ -293,25 +294,26 @@ static void styles() {
     updown.step(30 * 8);
     require(updown.pitches() == Notes({60, 64, 67, 64, 60, 64, 67, 64}));
 
-    // A key joining DN/UP keeps the direction it was travelling in.
+    // A key joining carries on by position in the new note list (as in Chain Arp
+    // and Seed Seq): DN/UP over 60 64 67 72 continues from its third position.
     Host joining;
     joining.configure(R32, arp::DownUp, 1, 50, 1, 1, 0, 100);
     joining.press(60); joining.press(64); joining.press(67);
     joining.step(31);
     joining.press(72);
     joining.step(120);
-    require(joining.pitches() == Notes({67, 64, 60, 64, 67, 72}));
+    require(joining.pitches() == Notes({67, 64, 64, 60, 64, 67}));
 
     // Two notes alternate, and one note repeats.
     require(first_notes(arp::DownUp, {60, 67}, 4) == Notes({67, 60, 67, 60}));
     require(first_notes(arp::DownUp, {60}, 3) == Notes({60, 60, 60}));
 
-    // Projects saved with six styles keep their style.
-    const u32 kept[6] = {arp::Up, arp::Down, arp::UpDown, arp::Order, arp::Random, arp::Chord};
-    for (u32 i = 0; i < 6; ++i) {
-        const u32 width = 0x7fffffffu / 6;
-        require(player::choice(static_cast<i32>(i * width + width / 2), arp::kStyles) == kept[i]);
-    }
+    // STYLE lists the shared patterns in the shared order, from UP.
+    Host order_check;
+    order_check.set(1, 0, arp::kStyles);
+    require(arp::read_params(order_check.controls).style == arp::Up);
+    order_check.set(1, arp::kStyles - 1, arp::kStyles);
+    require(arp::read_params(order_check.controls).style == arp::ChordThenUp);
 
     Host order;
     order.configure(R32, arp::Order, 2, 50, 1, 1, 0, 100);
@@ -345,21 +347,49 @@ static void styles() {
     require(top.pitches() == Notes({120, 120, 120, 120}));
 }
 
+// Every shared pattern, as Chain Arp and Seed Seq play it, on C E G with every step a hit.
+static void shared_patterns() {
+    struct Case { u32 style; Notes notes; };
+    const Case cases[] = {
+        {arp::Up, {60, 64, 67, 60}}, {arp::Down, {67, 64, 60, 67}},
+        {arp::UpDown, {60, 64, 67, 64, 60}}, {arp::DownUp, {67, 64, 60, 64, 67}},
+        {arp::UpDownBoth, {60, 64, 67, 67, 64, 60, 60}}, {arp::DownUpBoth, {67, 64, 60, 60, 64, 67, 67}},
+        {arp::Converge, {60, 67, 64, 60}}, {arp::Diverge, {64, 67, 60, 64}},
+        {arp::Pinky, {60, 67, 64, 67, 60}}, {arp::Thumb, {60, 64, 60, 67, 60}},
+        {arp::Stair, {60, 64, 67, 60}}, {arp::StairUpFalling, {67, 64, 60, 67}},
+        {arp::StairDownFalling, {67, 64, 60, 67}}, {arp::StairDownRising, {60, 64, 67, 60}},
+    };
+    for (const Case& c : cases) require(first_notes(c.style, {64, 67, 60}, c.notes.size()) == c.notes);
+    require(first_notes(arp::Order, {64, 67, 60}, 4) == Notes({64, 67, 60, 64}));
+    // CHD/1: one chord (highest first), then up.
+    require(first_notes(arp::ChordThenUp, {60, 64, 67}, 4) == Notes({67, 64, 60, 60, 64, 67}));
+    // The random patterns stay within the held notes; SHUF plays each once per cycle.
+    for (u32 style : {u32(arp::Shuffle), u32(arp::Random), u32(arp::Drunk)})
+        for (u32 pitch : first_notes(style, {60, 64, 67}, 60)) require(pitch == 60 || pitch == 64 || pitch == 67);
+    const Notes shuffled = first_notes(arp::Shuffle, {60, 64, 67}, 30);
+    for (size_t at = 0; at + 3 <= shuffled.size(); at += 3) {
+        Notes cycle(shuffled.begin() + at, shuffled.begin() + at + 3);
+        std::sort(cycle.begin(), cycle.end());
+        require(cycle == Notes({60, 64, 67}));
+    }
+}
+
 static void chord_of_eight() {
     Host h;
     h.configure(R16, arp::Chord, 2, 100, 1, 1, 0, 100);
     for (u32 i = 0; i < 8; ++i) h.press(60 + i);
     h.step(61);
-    // The first hit plays all eight keys; the next plays them an octave up.
+    // The first hit plays all eight keys; the next plays them an octave up. Each
+    // chord comes from one record, highest note first and lowest last, so a
+    // monophonic instrument keeps the lowest note.
     require(h.ons().size() == 16 && h.sounding() == 8);
     for (u32 i = 0; i < 8; ++i) {
-        require(h.ons()[i].time == kTogether && h.ons()[i].pitch == 60 + i);
-        require(h.ons()[8 + i].time == 60 && h.ons()[8 + i].pitch == 72 + i);
+        require(h.ons()[i].time == kTogether && h.ons()[i].pitch == 67 - i);
+        require(h.ons()[8 + i].time == 60 && h.ons()[8 + i].pitch == 79 - i);
     }
-    require(h.largest_drain == 8);
-    // A full drain must not disturb the clock.
+    require(h.largest_drain <= 8);
     h.step(60);
-    require(h.ons().size() == 24 && h.ons()[23].time == 120 && h.ons()[16].pitch == 60);
+    require(h.ons().size() == 24 && h.ons()[23].time == 120 && h.ons()[23].pitch == 60);
     require(h.stale_updates == 0);
 }
 
@@ -574,6 +604,7 @@ int main() {
     rates_and_event_drains();
     gates();
     styles();
+    shared_patterns();
     chord_of_eight();
     chance();
     cleanup();

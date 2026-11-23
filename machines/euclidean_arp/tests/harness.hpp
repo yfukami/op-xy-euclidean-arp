@@ -39,7 +39,8 @@ struct Host {
     }
     void configure(u32 rate, u32 style, u32 octaves, u32 gate_percent, u32 steps, u32 hits, u32 rotate, u32 chance,
                    bool keep_first = false) {
-        set(0, rate, arp::kRates); set(1, style, arp::kStyles); set(2, octaves - 1, 4); set(3, (gate_percent - 10) / 5, 19);
+        // STYLE lists the patterns after Off.
+        set(0, rate, arp::kRates); set(1, style - 1, arp::kStyles); set(2, octaves - 1, 4); set(3, (gate_percent - 10) / 5, 19);
         set(4, steps - 1, 16); set(5, hits, 17); set(6, rotate, 16); set(7, keep_first ? 40 - chance / 5 : chance / 5, 41);
     }
 
@@ -83,7 +84,7 @@ struct Host {
         u32 i = 0;
         for (; i < 8 && arp::update(state, controls, change); ++i) {
             require(change.mode == player::Replace);
-            require(change.plan.count == 1);  // an empty Replace would end the root for good
+            require(change.plan.count >= 1 && change.plan.count <= 8);  // an empty Replace would end the root for good
             store(change.root, change.plan, true);
         }
         if (i > largest_drain) largest_drain = i;

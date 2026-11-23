@@ -30,8 +30,23 @@ const u32 kRearmInterval = 32768;      // parked tones are renewed well before t
 const u32 kDefaultChordWindow = 7;     // player steps, about 15 ms at 120 BPM
 
 const u32 kRates = 9;
-enum Style { Up, Down, UpDown, DownUp, Order, Random, Chord };
-const u32 kStyles = 7;
+// The patterns, shared with Chain Arp, Seed Seq and Twin Arp. STYLE offers every
+// one but Off, in this order.
+enum Pattern {
+    Off, Up, Down, UpDown, DownUp, UpDownBoth, DownUpBoth, Order, Converge, Diverge,
+    Pinky, Thumb, Stair, StairUpFalling, StairDownFalling, StairDownRising,
+    Shuffle, Random, Drunk, Chord, ChordThenUp
+};
+const u32 kPatterns = 21;
+const u32 kStyles = kPatterns - 1;
+const u32 kChordHit = 0xff;  // next_index's answer for a step that plays every held note
+
+// The random styles' memory: SHUF's order, DRUNK's place and the generator.
+struct Walker {
+    u8 perm[kPool];
+    u32 perm_count, last, drunk, rng;
+    u8 drunk_placed;
+};
 
 struct Slot {
     u8 root, velocity, next_pitch, next_velocity;
@@ -41,13 +56,16 @@ struct Slot {
 struct State {
     Slot slots[kSlots];
     u8 pool_pitch[kPool], pool_slot[kPool];
+    u8 chord_pitch[kSlots], chord_velocity[kSlots];  // a chord hit's notes, highest first
+    Walker walker;
     u32 pool_count, pool_style, pool_octaves, order_counter;
-    u32 step, tick, gate_left, rearm, cursor, chord_octave, rng, start_wait;
+    u32 step, tick, gate_left, rearm, rng, start_wait;
+    u32 notes, played_length;  // the pattern's next position, and its cycle's length when it last played
     u8 active, sounding, off_mask, on_mask;
     u8 pool_dirty, first_hit, started, event_pending;
-    u8 draining, drain_calls, has_note, shown_pitch, returning;
+    u8 draining, drain_calls, has_note, shown_pitch;
     u8 waiting;  // a key arrived alone: the first hit waits for the rest of a chord
-    u8 has_last, last_pitch;  // the note reached last, even if CHANCE skipped it
+    u8 chord_slot, chord_count;  // the key whose record sounds a chord, plus one; its notes
 };
 
 struct Params {
@@ -67,7 +85,7 @@ inline Params read_params(const Controls& c) {
     static const u16 rates[kRates] = {320, 240, 160, 120, 80, 60, 40, 30, 20};
     Params p;
     p.rate = rates[choice(c.value[0], kRates)];
-    p.style = choice(c.value[1], kStyles);
+    p.style = 1 + choice(c.value[1], kStyles);
     p.octaves = 1 + choice(c.value[2], kOctaves);
     p.gate = 10 + 5 * choice(c.value[3], 19);
     p.steps = 1 + choice(c.value[4], kMaxSteps);
@@ -98,33 +116,6 @@ inline void add_to_pool(State& s, u32 pitch, u32 slot) {
     s.pool_pitch[s.pool_count] = static_cast<u8>(pitch);
     s.pool_slot[s.pool_count] = static_cast<u8>(slot);
     ++s.pool_count;
-}
-
-// After the pool changes, continue from the note last played, so that a key
-// joining the arpeggio neither repeats that note nor skips one.
-inline void anchor_cursor(State& s, u32 style) {
-    const u32 n = s.pool_count;
-    if (!s.has_last || !n || style == Random || style == Chord) return;
-    const u32 last = s.last_pitch;
-    if (style == Order) {
-        for (u32 i = 0; i < n; ++i)
-            if (s.pool_pitch[i] == last) s.cursor = i + 1;
-        return;
-    }
-    u32 below = 0;
-    while (below < n && s.pool_pitch[below] < last) ++below;
-    const u32 above = below < n && s.pool_pitch[below] == last ? below + 1 : below;
-    if (style == Up) {
-        s.cursor = above;
-    } else if (style == Down) {
-        s.cursor = below ? n - below : 0;
-    } else {
-        // DN/UP is UP/DN over the pool read from the top.
-        const u32 before = style == UpDown ? below : n - above;
-        const u32 after = style == UpDown ? above : n - below;
-        if (s.returning && n > 1) s.cursor = before ? 2 * n - 2 - (before - 1) : 1;
-        else s.cursor = after;
-    }
 }
 
 // Runs only when the held keys, STYLE or OCTAVE changed; bounded by kPool.
@@ -160,7 +151,6 @@ inline void rebuild_pool(State& s, const Params& p) {
     s.pool_style = p.style;
     s.pool_octaves = p.octaves;
     s.pool_dirty = 0;
-    anchor_cursor(s, p.style);
 }
 
 inline u32 next_random(State& s) {
@@ -172,16 +162,99 @@ inline u32 next_random(State& s) {
     return x;
 }
 
-inline u32 next_pool_index(State& s, u32 style) {
-    const u32 n = s.pool_count;
-    if (style == Random) return ((next_random(s) >> 16) * n) >> 16;
-    const u32 period = (style == UpDown || style == DownUp) && n > 1 ? 2 * n - 2 : n;
-    if (s.cursor >= period) s.cursor = 0;
-    const u32 at = s.cursor++;
-    if (style == Down) return n - 1 - at;
-    s.returning = at >= n;
-    const u32 bounced = at < n ? at : period - at;
-    return style == DownUp ? n - 1 - bounced : bounced;
+// ---- Patterns, as in Chain Arp: pure functions of the position and N, the note count ----
+
+inline u32 cycle_length(u32 pattern, u32 n) {
+    if (!n) return 0;
+    if (n == 1) return 1;
+    switch (pattern) {
+    case UpDown:
+    case DownUp: return 2 * n - 2;
+    case UpDownBoth:
+    case DownUpBoth: return 2 * n;
+    case Pinky:
+    case Thumb: return 2 * (n - 1);
+    case Stair:
+    case StairUpFalling:
+    case StairDownFalling:
+    case StairDownRising: return n < 3 ? n : 3 * (n - 2);
+    case ChordThenUp: return 1 + n;
+    default: return n;
+    }
+}
+
+inline u32 walker_random(u32& rng) {
+    u32 x = rng ? rng : 0x9e3779b9u;
+    x ^= x << 13;
+    x ^= x >> 17;
+    x ^= x << 5;
+    rng = x;
+    return x;
+}
+
+inline u32 random_below(u32& rng, u32 n) { return ((walker_random(rng) >> 16) * n) >> 16; }
+
+inline u32 converge(u32 step, u32 n) { return (step & 1) ? n - 1 - (step >> 1) : (step >> 1); }
+
+// SHUF: every note once per cycle, never starting on the note that ended the last one.
+inline void shuffle(Walker& w, u32 n) {
+    for (u32 i = 0; i < n; ++i) w.perm[i] = static_cast<u8>(i);
+    for (u32 i = n - 1; i > 0; --i) {
+        const u32 j = random_below(w.rng, i + 1);
+        const u8 swap = w.perm[i];
+        w.perm[i] = w.perm[j];
+        w.perm[j] = swap;
+    }
+    if (n > 1 && w.perm[0] == w.last) {
+        const u8 swap = w.perm[0];
+        w.perm[0] = w.perm[1];
+        w.perm[1] = swap;
+    }
+    w.perm_count = n;
+}
+
+// The 0-based index into the note list at `step` of a cycle, or kChordHit.
+inline u32 next_index(u32 pattern, u32 step, u32 n, Walker& w) {
+    if (n <= 1) return 0;
+    switch (pattern) {
+    case Up:
+    case Order: return step;
+    case Down: return n - 1 - step;
+    case UpDown: return step < n ? step : 2 * n - 2 - step;
+    case DownUp: return n - 1 - (step < n ? step : 2 * n - 2 - step);
+    case UpDownBoth: return step < n ? step : 2 * n - 1 - step;
+    case DownUpBoth: return step < n ? n - 1 - step : step - n;
+    case Converge: return converge(step, n);
+    case Diverge: return converge(n - 1 - step, n);
+    case Pinky: return (step & 1) ? n - 1 : step >> 1;
+    case Thumb: return (step & 1) ? (step + 1) >> 1 : 0;
+    // The stairs: groups of three, the staircase climbing up or down one note per
+    // group, the notes in each group rising or falling. Under 3 notes: UP or DOWN.
+    case Stair: return n < 3 ? step : divide(step, 3) + modulo(step, 3);
+    case StairUpFalling: return n < 3 ? step : divide(step, 3) + 2 - modulo(step, 3);
+    case StairDownFalling: return n < 3 ? n - 1 - step : n - 1 - divide(step, 3) - modulo(step, 3);
+    case StairDownRising: return n < 3 ? n - 1 - step : n - 3 - divide(step, 3) + modulo(step, 3);
+    case Shuffle: {
+        if (!step || w.perm_count != n) shuffle(w, n);
+        w.last = w.perm[step];
+        return w.last;
+    }
+    case Random: return random_below(w.rng, n);
+    case Drunk: {
+        if (!w.drunk_placed || w.drunk >= n) {
+            w.drunk = random_below(w.rng, n);
+            w.drunk_placed = 1;
+        } else if (walker_random(w.rng) & 0x10000u) {
+            w.drunk = w.drunk + 1 < n ? w.drunk + 1 : w.drunk - 1;
+        } else {
+            w.drunk = w.drunk ? w.drunk - 1 : 1;
+        }
+        return w.drunk;
+    }
+    case Chord: return kChordHit;
+    case ChordThenUp: return step ? step - 1 : kChordHit;
+    default: return 0;
+    }
 }
 
 inline void queue_note(State& s, u32 slot, u32 pitch, u32 velocity) {
@@ -208,36 +281,54 @@ inline void start_gate(State& s, const Params& p) {
     s.gate_left = gate ? gate : 1;
 }
 
-// Returns whether the hit sounded.
+// Plays (or, by CHANCE, skips) a hit. Each hit takes the pattern's next note; a
+// skipped hit still moves the pattern on, so the melody keeps its place. If the
+// held keys change, the position carries on into the new note list. Returns
+// whether the hit sounded.
 inline bool trigger(State& s, const Params& p) {
     s.off_mask |= s.sounding;
+    s.chord_slot = 0;
     ensure_pool(s, p);
     const bool play = (p.keep_first && s.first_hit) || roll_chance(s, p.chance);
     s.first_hit = 0;
-    bool any = false;
-    u32 lowest = 127;
-    if (p.style == Chord) {
-        if (s.chord_octave >= p.octaves) s.chord_octave = 0;
-        const u32 shift = 12 * s.chord_octave++;
-        for (u32 i = 0; i < kSlots; ++i) {
-            if (!(s.active >> i & 1) || s.slots[i].root + shift > 127) continue;
-            const u32 pitch = s.slots[i].root + shift;
-            if (play) queue_note(s, i, pitch, s.slots[i].velocity);
-            lowest = smaller(lowest, pitch);
-            any = true;
-        }
-    } else if (s.pool_count) {
-        const u32 at = next_pool_index(s, p.style);
-        const u32 slot = s.pool_slot[at];
-        lowest = s.pool_pitch[at];
-        if (play) queue_note(s, slot, lowest, s.slots[slot].velocity);
-        any = true;
-    }
-    if (!any) return false;
-    s.last_pitch = static_cast<u8>(lowest);
-    s.has_last = 1;
+    const u32 n = s.pool_count;
+    if (!n) return false;
+    // As in Chain Arp: a cycle that played to its end starts again, and a position
+    // beyond a shorter note list wraps into it.
+    const u32 length = cycle_length(p.style, n);
+    if (s.notes >= length) s.notes = s.notes == s.played_length ? 0 : modulo(s.notes, length);
+    const u32 at = s.notes++;
+    s.played_length = length;
+    const u32 index = next_index(p.style, at, n, s.walker);
     if (!play) return false;
-    s.shown_pitch = static_cast<u8>(lowest);
+    if (index == kChordHit) {
+        // Every held key, CHORD climbing OCTAVE one octave per hit, from one record,
+        // highest note first and lowest last, so a monophonic instrument keeps the
+        // lowest note.
+        const u32 shift = 12 * (p.style == Chord ? modulo(at, p.octaves) : 0);
+        u32 lowest = kSlots;
+        s.chord_count = 0;
+        for (u32 i = 0; i < kSlots; ++i) {
+            const u32 pitch = s.slots[i].root + shift;
+            if (!(s.active >> i & 1) || pitch > 127) continue;
+            u32 j = s.chord_count++;
+            for (; j && s.chord_pitch[j - 1] < pitch; --j) {
+                s.chord_pitch[j] = s.chord_pitch[j - 1];
+                s.chord_velocity[j] = s.chord_velocity[j - 1];
+            }
+            s.chord_pitch[j] = static_cast<u8>(pitch);
+            s.chord_velocity[j] = s.slots[i].velocity;
+            if (lowest == kSlots || s.slots[i].root < s.slots[lowest].root) lowest = i;
+        }
+        if (lowest == kSlots) return false;
+        s.chord_slot = static_cast<u8>(lowest + 1);
+        queue_note(s, lowest, s.chord_pitch[s.chord_count - 1], s.slots[lowest].velocity);
+        s.shown_pitch = s.chord_pitch[s.chord_count - 1];  // the lowest note
+    } else {
+        const u32 slot = s.pool_slot[index];
+        queue_note(s, slot, s.pool_pitch[index], s.slots[slot].velocity);
+        s.shown_pitch = s.pool_pitch[index];
+    }
     s.has_note = 1;
     start_gate(s, p);
     return true;
@@ -330,6 +421,7 @@ bool press(State& s, const Controls&, u32 note, u32 velocity, Plan& plan) {
     key.order = ++s.order_counter;
     s.active |= bit;
     s.sounding &= static_cast<u8>(~bit);  // the plan replaces anything this root held
+    if (s.chord_slot == slot + 1) s.chord_slot = 0;
     s.off_mask &= static_cast<u8>(~bit);
     s.on_mask &= static_cast<u8>(~bit);
     s.pool_dirty = 1;
@@ -337,10 +429,14 @@ bool press(State& s, const Controls&, u32 note, u32 velocity, Plan& plan) {
     park(plan.tones[0], note);
     if (!first) return true;
 
-    s.step = s.tick = s.gate_left = s.rearm = s.cursor = s.chord_octave = s.start_wait = 0;
-    s.started = s.has_note = s.has_last = s.returning = s.waiting = 0;
+    s.step = s.tick = s.gate_left = s.rearm = s.notes = s.played_length = s.start_wait = 0;
+    s.started = s.has_note = s.waiting = s.chord_slot = 0;
     s.first_hit = 1;
     if (!s.rng) s.rng = 0x9e3779b9u ^ (note << 8) ^ key.velocity;
+    s.walker.rng = next_random(s);  // the random styles start somewhere new each phrase
+    s.walker.perm_count = 0;
+    s.walker.last = 0xff;
+    s.walker.drunk_placed = 0;
     return true;
 }
 
@@ -353,6 +449,7 @@ bool release(State& s, u32 note) {
     s.sounding &= keep;
     s.off_mask &= keep;
     s.on_mask &= keep;
+    if (s.chord_slot == slot + 1) s.chord_slot = 0;
     s.pool_dirty = 1;
     if (!s.active) s.gate_left = 0;
     return false;  // stock releases this root's notes
@@ -387,6 +484,14 @@ bool update(State& s, const Controls& c, Update& change) {
         change.plan.tones[0].pitch = s.slots[slot].next_pitch;
         change.plan.tones[0].velocity = s.slots[slot].next_velocity;
         change.plan.tones[0].delay = 0;
+        if (s.chord_slot == slot + 1 && s.chord_count) {
+            change.plan.count = s.chord_count;  // stock sounds a record's notes in this order
+            for (u32 i = 0; i < s.chord_count; ++i) {
+                change.plan.tones[i].pitch = s.chord_pitch[i];
+                change.plan.tones[i].velocity = s.chord_velocity[i];
+                change.plan.tones[i].delay = 0;
+            }
+        }
     }
     if (++s.drain_calls >= kDrainLimit) s.draining = 0;  // the SDK stops calling here
     return true;
@@ -418,7 +523,9 @@ inline void show_number(char (&out)[8], u32 value, const char* suffix) {
 void display(const State& s, const Controls& c, Display& d) {
     static const char rates[kRates][6] = {"1/2t", "1/4", "1/4t", "1/8", "1/8t", "1/16", "1/16t", "1/32", "1/32t"};
     // Lower case: a header value has under 60 px, and "CHORD" or "DOWN" would reach the next title.
-    static const char styles[kStyles][6] = {"up", "down", "up/dn", "dn/up", "order", "rand", "chord"};
+    static const char styles[kPatterns][6] = {"off", "up", "down", "up/dn", "dn/up", "updn+", "dnup+", "order", "conv",
+                                              "divrg", "pinky", "thumb", "stu+", "stu-", "std-", "std+", "shuf", "rand",
+                                              "drunk", "chord", "chd/1"};
     static const char notes[12][3] = {"C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"};
     const Params p = read_params(c);
     u32 at = 0;

@@ -29,7 +29,7 @@
     {
       "id": "style",
       "label": "STYLE",
-      "default": 0.071429,
+      "default": 0.025,
       "mapping": {
         "kind": "enum",
         "labels": [
@@ -37,9 +37,22 @@
           "DOWN",
           "UP-DN",
           "DN-UP",
+          "UPDN+",
+          "DNUP+",
           "ORDER",
+          "CONV",
+          "DIVRG",
+          "PINKY",
+          "THUMB",
+          "STU+",
+          "STU-",
+          "STD-",
+          "STD+",
+          "SHUF",
           "RAND",
-          "CHORD"
+          "DRUNK",
+          "CHORD",
+          "CHD-1"
         ]
       },
       "display": "enum"

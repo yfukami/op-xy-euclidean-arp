@@ -31,7 +31,7 @@ Where a check uses a chord, step-sequence C, E, G into step 1 with a note length
 ## Controls and screen
 
 10. **Page switching.** Press any encoder. Pass: the header switches pages, and all eight names and values read correctly.
-11. **Full range of every control.** Pass: one value per detent. GATE steps `10%` to `100%`. RATE shows `1/2t` to `1/32t`, and STYLE shows `up` to `chord`, without touching the next column. CHANCE runs `0%` to `100%`, then `95%*` to `0%*`.
+11. **Full range of every control.** Pass: one value per detent. GATE steps `10%` to `100%`. RATE shows `1/2t` to `1/32t`, and STYLE shows `up` to `chd/1` (20 patterns), without touching the next column. CHANCE runs `0%` to `100%`, then `95%*` to `0%*`.
 12. **Limits.** STEPS 16, HITS 12, ROTATE 10, then STEPS 6. Pass: HITS and ROTATE show `6` and `5`, and the ring shows a valid pattern.
 13. **Playhead.** STEPS 16, HITS 5, hold a key. Pass: exactly one inner tick shows, visiting all 16 positions in order. The black covers hiding the other ticks are invisible against the black page.
 14. **Layout.** Pass: the ring and the centre note sit below the header and read clearly.
@@ -40,7 +40,7 @@ Where a check uses a chord, step-sequence C, E, G into step 1 with a note length
 
 ## Musical features
 
-17. **Styles,** with the chord and STEPS 8, HITS 8. Pass: `up` C E G, `down` G E C, `up/dn` C E G E, `dn/up` G E C E, `order` arrival order, `rand` random notes from the chord, `chord` all three together.
+17. **Styles,** with the chord and STEPS 8, HITS 8. Pass: each of the 20 patterns plays as the README's Patterns table says, for example `up` C E G, `updn+` C E G G E C, `conv` C G E, `pinky` C G E G, `stu-` G E C, `shuf` each note once per cycle, `chord` all three together, `chd/1` the chord then C E G. On a monophonic synth, `chord` keeps C.
 18. **Sequenced first note.** Pass: with `up`, every repeat starts on C, on the step, with no double attack.
 19. **Hand-played chords.** Pass: with `up`, usually starts on C. A very quick double attack is acceptable when C lands last.
 20. **Octaves.** Pass: OCTAVE `2` plays the chord, then an octave up. At OCTAVE `4`, notes above MIDI 127 drop out.
