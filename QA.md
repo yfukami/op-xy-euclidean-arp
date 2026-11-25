@@ -65,6 +65,7 @@ Where a check uses a chord, step-sequence C, E, G into step 1 with a note length
 - Checks 1–10, 12–26 and 28 ran on build `all-005`, made from commit `6cda5d2` (20 shared patterns, 15 ms chord wait).
 - Check 11 failed on `all-005`: the STYLE labels `updn+`, `dnup+` and `thumb` overlapped the OCTAVE title. They became `u/d+`, `d/u+` and `thmb`, and check 11 passed on build `all-006`. On `all-006`, `u/d+`, `d/u+` and `thmb` also played as the Patterns table says.
 - Check 27 ran on `all-006`, reopening the project saved in check 15 on `all-005`.
+- `all-006` matches commit `1d46024`. Commits after it change documentation and code comments only.
 
 ### 1.0.0
 

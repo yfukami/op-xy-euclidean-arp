@@ -21,7 +21,7 @@ Press any encoder to switch pages.
 
 ## Patterns
 
-The patterns are the same as in Chain Arp and Seed Seq, in the same order. They work on the held notes, sorted low to high and repeated across OCTAVE. N is the number of notes in that list. The examples use C E G B held, with OCTAVE 1 (N = 4). A pattern moves on at each hit.
+The patterns are the same as in Chain Arp and Seed Arp, in the same order. They work on the held notes, sorted low to high and repeated across OCTAVE. N is the number of notes in that list. The examples use C E G B held, with OCTAVE 1 (N = 4). A pattern moves on at each hit.
 
 | Label | Behaviour | Cycle length (steps) | Example |
 |---|---|---|---|

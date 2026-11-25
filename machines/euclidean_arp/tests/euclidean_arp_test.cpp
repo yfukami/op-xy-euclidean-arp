@@ -295,7 +295,7 @@ static void styles() {
     require(updown.pitches() == Notes({60, 64, 67, 64, 60, 64, 67, 64}));
 
     // A key joining carries on by position in the new note list (as in Chain Arp
-    // and Seed Seq): DN/UP over 60 64 67 72 continues from its third position.
+    // and Seed Arp): DN/UP over 60 64 67 72 continues from its third position.
     Host joining;
     joining.configure(R32, arp::DownUp, 1, 50, 1, 1, 0, 100);
     joining.press(60); joining.press(64); joining.press(67);
@@ -347,7 +347,7 @@ static void styles() {
     require(top.pitches() == Notes({120, 120, 120, 120}));
 }
 
-// Every shared pattern, as Chain Arp and Seed Seq play it, on C E G with every step a hit.
+// Every shared pattern, as Chain Arp and Seed Arp play it, on C E G with every step a hit.
 static void shared_patterns() {
     struct Case { u32 style; Notes notes; };
     const Case cases[] = {
