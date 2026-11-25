@@ -40,7 +40,7 @@ Where a check uses a chord, step-sequence C, E, G into step 1 with a note length
 
 ## Musical features
 
-17. **Styles,** with the chord and STEPS 8, HITS 8. Pass: each of the 20 patterns plays as the README's Patterns table says, for example `up` C E G, `updn+` C E G G E C, `conv` C G E, `pinky` C G E G, `stu-` G E C, `shuf` each note once per cycle, `chord` all three together, `chd/1` the chord then C E G. On a monophonic synth, `chord` keeps C.
+17. **Styles,** with the chord and STEPS 8, HITS 8. Pass: each of the 20 patterns plays as the README's Patterns table says, for example `up` C E G, `u/d+` C E G G E C, `conv` C G E, `pinky` C G E G, `stu-` G E C, `shuf` each note once per cycle, `chord` all three together, `chd/1` the chord then C E G. On a monophonic synth, `chord` keeps C.
 18. **Sequenced first note.** Pass: with `up`, every repeat starts on C, on the step, with no double attack.
 19. **Hand-played chords.** Pass: with `up`, usually starts on C. A very quick double attack is acceptable when C lands last.
 20. **Octaves.** Pass: OCTAVE `2` plays the chord, then an octave up. At OCTAVE `4`, notes above MIDI 127 drop out.
@@ -57,6 +57,16 @@ Where a check uses a chord, step-sequence C, E, G into step 1 with a note length
 28. **Fresh start.** Release all keys, then press one. Pass: the first note comes at once, and the tick starts at the top of the ring.
 
 ## Results
+
+### 1.1.0
+
+2026-11-22 to 2026-11-23, OS 1.2.1, all 28 checks passed, with check 8c skipped.
+
+- Checks 1–10, 12–26 and 28 ran on build `all-005`, made from commit `6cda5d2` (20 shared patterns, 15 ms chord wait).
+- Check 11 failed on `all-005`: the STYLE labels `updn+`, `dnup+` and `thumb` overlapped the OCTAVE title. They became `u/d+`, `d/u+` and `thmb`, and check 11 passed on build `all-006`. On `all-006`, `u/d+`, `d/u+` and `thmb` also played as the Patterns table says.
+- Check 27 ran on `all-006`, reopening the project saved in check 15 on `all-005`.
+
+### 1.0.0
 
 2026-11-19, OS 1.2.1, all 28 checks passed, with check 8c skipped.
 

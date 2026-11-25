@@ -523,8 +523,8 @@ inline void show_number(char (&out)[8], u32 value, const char* suffix) {
 void display(const State& s, const Controls& c, Display& d) {
     static const char rates[kRates][6] = {"1/2t", "1/4", "1/4t", "1/8", "1/8t", "1/16", "1/16t", "1/32", "1/32t"};
     // Lower case: a header value has under 60 px, and "CHORD" or "DOWN" would reach the next title.
-    static const char styles[kPatterns][6] = {"off", "up", "down", "up/dn", "dn/up", "updn+", "dnup+", "order", "conv",
-                                              "divrg", "pinky", "thumb", "stu+", "stu-", "std-", "std+", "shuf", "rand",
+    static const char styles[kPatterns][6] = {"off", "up", "down", "up/dn", "dn/up", "u/d+", "d/u+", "order", "conv",
+                                              "divrg", "pinky", "thmb", "stu+", "stu-", "std-", "std+", "shuf", "rand",
                                               "drunk", "chord", "chd/1"};
     static const char notes[12][3] = {"C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"};
     const Params p = read_params(c);
